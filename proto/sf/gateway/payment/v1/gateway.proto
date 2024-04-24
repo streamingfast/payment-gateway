@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package sf.gateway.payment.v1;
+
+option go_package = "github.com/streamingfast/payment-gateway/pb/sf/gateway/payment/v1;pbgateway";
+
+import "sf/metering/v1/metering.proto";
+
+service DiscoverService {
+  rpc Services(ServicesRequest) returns (ServicesResponse);
+}
+
+message ServicesRequest {
+}
+
+message ServicesResponse {
+  string usage_endpoint = 1; // points to the "Usage" service endpoint
+  string auth_endpoint = 2; // .. for "Auth"
+  string revocation_endpoint = 3; // .. for "Revocation"
+}
+
+service UsageService {
+  rpc Report(ReportRequest) returns (ReportResponse);
+}
+
+message ReportRequest {
+    repeated sf.metering.v1.Event events = 1;
+}
+
+message ReportResponse {
+  bool revoked = 1;
+  string revocation_reason = 2;
+}
+
+service AuthService {
+  rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse);
+}
+
+message AuthenticateRequest { // similar to a request to our jwt issuer.
+  string api_key = 1;
+  optional string origin = 2;
+  optional string ip_addr = 3;
+  uint64 lifetime_seconds = 4; // usually long-lived
+}
+
+message AuthenticateResponse {
+  bool success = 2;
+  string jwt = 1;
+  uint64 expiration = 3;
+  string user_id = 4;
+  string jwt_id = 5;
+  //bytes key_authority = 6; // Who signed this? What's the public key? For us to validate whether we will honor this partner. Say this is E&N's, are we configured to honor those keys?
+}
+
+// // Maybe not needed if the Usage callback returns some
+// // potential revocation information.
+// service Revocation {
+//   rpc Check(CheckReq) returns (CheckResp);
+//   rpc Announce(stream AnnounceReq) returns (RevocationAnnouncement);
+// }
+
+// message CheckReq {
+//   string jwt_id = 1;
+//   string user_id = 2;
+// }
+// message CheckResp {
+//   bool all_good = 1;
+//   string revocation_reason = 2;
+// }
+// message AnnounceReq {}
+// message RevocationAnnouncement {
+//   optional string revoked_jwt_id = 1;
+//   optional string revoked_user_id = 2;
+// }

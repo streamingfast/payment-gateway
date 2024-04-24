@@ -1,0 +1,4 @@
+version: v1
+name: buf.build/streamingfast/payment-gateway
+deps:
+  - buf.build/streamingfast/metering
