@@ -1,0 +1,8 @@
+go 1.22.0
+
+// We commit this files to make it easier to run and develop the examples,
+// don't forget from time to time to run `go get github.com/streamingfast/payment-gateway`
+// inside ./examples to update the dependencies.
+
+use .
+use ./examples
