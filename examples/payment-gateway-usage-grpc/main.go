@@ -14,12 +14,15 @@ import (
 )
 
 func main() {
-	endpoint := osEnvOr("PAYMENT_GATEWAY_ENDPOINT", "payment.gateway.streamingfast.io:443")
+	endpoint := osEnvOr("PAYMENT_GATEWAY_ENDPOINT", "abp.thegraph.market:443")
 	insecure := osEnvOr("PAYMENT_GATEWAY_INSECURE", "false")
 	plainText := osEnvOr("PAYMENT_GATEWAY_PLAINTEXT", "false")
-	token := osEnv("SF_API_TOKEN")
+	token := osEnv("API_TOKEN")
 
 	conn, err := dgrpc.NewClientConn(endpoint,
+		// We add this to easily have ways to test different variations, if you plan to always use
+		// a "production" endpoint, you can remove this option altogether and a secure TLS
+		// connection will be always be used by default.
 		dgrpc.WithMustAutoTransportCredentials(insecure == "true", plainText == "true", false),
 		grpc.WithPerRPCCredentials(oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
 			AccessToken: token,

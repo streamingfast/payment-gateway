@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/streamingfast/dmetering"
@@ -9,11 +10,18 @@ import (
 )
 
 func init() {
+	// Register paymentGateway:// as a valid metering plugin, refers to Register documentation for extra details
 	metering.Register()
 }
 
 func main() {
-	pluginDSN := os.ExpandEnv("paymentGateway://payment.gateway.streamingfast.io?network=eth-mainnet&token=${SF_API_TOKEN}")
+	checkEnv("API_TOKEN")
+
+	// The ${API_TOKEN} is expanded automatically by the metering plugin via your defind environment variables
+	// (as well as any other variables)!
+	//
+	// The [network] query parameter is required and should match the well-know network identifier.
+	pluginDSN := "paymentGateway://abp.thegraph.market?network=eth-mainnet&token=${API_TOKEN}"
 
 	eventEmitter, err := dmetering.New(pluginDSN, zap.NewNop())
 	if err != nil {
@@ -21,4 +29,10 @@ func main() {
 	}
 
 	_ = eventEmitter
+}
+
+func checkEnv(key string) {
+	if _, exists := os.LookupEnv(key); !exists {
+		panic(fmt.Errorf("missing required environment variable %q", key))
+	}
 }

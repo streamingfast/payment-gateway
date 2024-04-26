@@ -13,7 +13,7 @@ This library enables the `paymentGateway://...` metering plugin that can be hook
 To register the scheme and obtain a metering event emitter, you can use the following snippet:
 
 > [!NOTE]
-> Full example with import(s) at [./examples/payment-gateway-metering](./examples/payment-gateway-metering/main.go).
+> Full example with import(s) and code annotations at [./examples/payment-gateway-metering](./examples/payment-gateway-metering/main.go).
 
 ```go
 func init() {
@@ -22,7 +22,7 @@ func init() {
 }
 
 func main() {
-	pluginDSN := os.ExpandEnv("paymentGateway://payment.gateway.streamingfast.io?network=eth-mainnet&token=${SF_API_TOKEN}")
+	pluginDSN := "paymentGateway://abp.thegraph.market?network=eth-mainnet&token=${API_TOKEN}"
 
 	eventEmitter, err := dmetering.New(pluginDSN, zap.NewNop())
 	if err != nil {
@@ -39,12 +39,13 @@ func main() {
 #### gRPC
 
 > [!NOTE]
-> Full example with import(s) at [./examples/payment-gateway-usage-grpc](./examples/payment-gateway-usage-grpc/main.go).
+> Full example with import(s) and code annotations at [./examples/payment-gateway-usage-grpc](./examples/payment-gateway-usage-grpc/main.go).
 
 ```go
 func main() {
-	conn, err := dgrpc.NewClientConn("payment.gateway.streamingfast.io:443",
-		dgrpc.WithMustAutoTransportCredentials(false, false, false),
+	token := os.Getenv("API_TOKEN")
+
+	conn, err := dgrpc.NewClientConn("abp.thegraph.market:443",
 		grpc.WithPerRPCCredentials(oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
 			AccessToken: token,
 		})}),
