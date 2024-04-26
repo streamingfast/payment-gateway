@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetering"
 	pbmetering "github.com/streamingfast/dmetering/pb/sf/metering/v1"
@@ -15,6 +16,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/oauth"
 )
 
@@ -167,7 +169,22 @@ func (e *emitter) emit(events []*pbmetering.Event) {
 		return
 	}
 	e.logger.Debug("tracking events", zap.Int("count", len(events)))
-	if _, err := e.client.Report(context.Background(), &pbgateway.ReportRequest{Events: events}); err != nil {
+
+	err := derr.RetryContext(context.Background(), 5, func(ctx context.Context) error {
+		_, err := e.client.Report(context.Background(), &pbgateway.ReportRequest{Events: events})
+
+		if dgrpc.IsGRPCErrorCode(err, codes.Unauthenticated) || dgrpc.IsGRPCErrorCode(err, codes.PermissionDenied) {
+			return derr.NewFatalError(err)
+		}
+
+		if err != nil {
+			MeteringGRPCRetryCounter.Inc()
+		}
+
+		return nil
+	})
+
+	if err != nil {
 		MeteringGRPCErrCounter.Inc()
 		e.logger.Warn("failed to emit event", zap.Error(err))
 	}

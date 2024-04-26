@@ -4,6 +4,7 @@ go 1.22.0
 
 require (
 	connectrpc.com/connect v1.16.1
+	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20240423143010-f36784700c9a
 	github.com/streamingfast/dmetering v0.0.0-20240422183130-658027cbb7a1
 	github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed
@@ -50,8 +51,10 @@ require (
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.0 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
+	github.com/sethvargo/go-retry v0.2.3 // indirect
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424 // indirect
 	github.com/streamingfast/sf-tracing v0.0.0-20240209202324-9daa52c71a52 // indirect
+	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.9.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.36.4 // indirect
