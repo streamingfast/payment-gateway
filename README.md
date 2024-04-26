@@ -2,6 +2,10 @@
 
 This repository contains public interfaces, clients and other utilities for the StreamingFast Payment Gateway, which is the all encompassing Gateway for consuming Substreams and Firehose services as well as tooling for indexer to report their usage.
 
+### Service Developers
+
+This section serves as the documentation for developers that would like to offer their services on StreamingFast Payment Gateway. If you are **only** a consumer of services, this section is not for you.
+
 ### Usage Reporting
 
 This library enables the `paymentGateway://...` metering plugin that can be hooked into your application for reporting usages.

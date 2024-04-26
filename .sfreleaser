@@ -1,0 +1,6 @@
+global:
+  language: golang
+  variant: library
+release:
+  pre-build-hooks:
+  - go test ./... && go test ./examples/...
