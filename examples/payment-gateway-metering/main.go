@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	metering.Register(
+	metering.Register()
 }
 
 func main() {

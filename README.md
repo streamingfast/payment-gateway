@@ -13,6 +13,7 @@ To register the scheme and obtain a metering event emitter, you can use the foll
 
 ```go
 func init() {
+	// Register paymentGateway:// as a valid metering plugin, refers to Register documentation for extra details
 	metering.Register()
 }
 
