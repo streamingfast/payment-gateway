@@ -170,15 +170,15 @@ func (e *emitter) emit(events []*pbmetering.Event) {
 	}
 	e.logger.Debug("tracking events", zap.Int("count", len(events)))
 
-	err := derr.RetryContext(context.Background(), 5, func(ctx context.Context) error {
+	err := derr.RetryContext(context.Background(), 3, func(ctx context.Context) error {
 		_, err := e.client.Report(context.Background(), &pbgateway.ReportRequest{Events: events})
-
-		if dgrpc.IsGRPCErrorCode(err, codes.Unauthenticated) || dgrpc.IsGRPCErrorCode(err, codes.PermissionDenied) {
-			return derr.NewFatalError(err)
-		}
-
 		if err != nil {
+			if dgrpc.IsGRPCErrorCode(err, codes.Unauthenticated) || dgrpc.IsGRPCErrorCode(err, codes.PermissionDenied) {
+				return derr.NewFatalError(err)
+			}
+
 			MeteringGRPCRetryCounter.Inc()
+			return err
 		}
 
 		return nil
