@@ -117,7 +117,8 @@ func (e *emitter) launch() {
 			e.emit(e.activeBatch)
 			e.activeBatch = []*pbmetering.Event{}
 		case ev := <-e.buffer:
-			e.activeBatch = append(e.activeBatch, ev.ToProto(e.config.Network))
+			ev.Network = e.config.Network
+			e.activeBatch = append(e.activeBatch, ev.ToProto())
 		}
 	}
 }
@@ -133,7 +134,8 @@ func (e *emitter) flushAndCloseEvent() {
 
 	for {
 		ev, ok := <-e.buffer
-		protoEv := ev.ToProto(e.config.Network)
+		ev.Network = e.config.Network
+		protoEv := ev.ToProto()
 		if !ok {
 			e.logger.Info("sending last events", zap.Int("count", len(e.activeBatch)))
 			e.emit(e.activeBatch)

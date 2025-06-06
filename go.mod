@@ -6,7 +6,7 @@ require (
 	connectrpc.com/connect v1.16.1
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20240423143010-f36784700c9a
-	github.com/streamingfast/dmetering v0.0.0-20240422183130-658027cbb7a1
+	github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e
 	github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed
 	github.com/streamingfast/shutter v1.5.0
 	github.com/stretchr/testify v1.8.4
