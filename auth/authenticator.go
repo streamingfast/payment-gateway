@@ -1,0 +1,297 @@
+package auth
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/streamingfast/dauth"
+	"go.uber.org/zap"
+)
+
+// Register registers the payment gateway authenticator with dauth
+func Register() {
+	dauth.Register("paymentgateway", func(config string, logger *zap.Logger) (dauth.Authenticator, error) {
+		configExpanded := os.ExpandEnv(config)
+
+		c, err := newConfig(configExpanded)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse config string %s: %w", config, err)
+		}
+		return new(c, logger)
+	})
+}
+
+func new(config *Config, logger *zap.Logger) (dauth.Authenticator, error) {
+	var jwkSet jwk.Set
+	switch {
+	case config.PubKeyURL != "":
+		set, err := jwkSetFromURL(config.PubKeyURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch JWK set from %s: %w", config.PubKeyURL, err)
+		}
+		jwkSet = set
+	case config.PubKeyBase64 != "":
+		set, err := jwkSetFromBase64(config.PubKeyBase64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch JWK set from %s: %w", config.PubKeyBase64, err)
+		}
+		jwkSet = set
+	default:
+		return nil, fmt.Errorf("no JWK URL or public key URL provided")
+	}
+
+	return &authenticator{
+		config:     config,
+		logger:     logger,
+		jwkSet:     jwkSet,
+		httpClient: &http.Client{Timeout: 15 * time.Second},
+	}, nil
+}
+
+type authenticator struct {
+	config     *Config
+	logger     *zap.Logger
+	jwkSet     jwk.Set
+	httpClient *http.Client
+}
+
+func (a *authenticator) Authenticate(ctx context.Context, path string, headers map[string][]string, ipAddress string) (context.Context, error) {
+	// Convert headers to lowercase for case-insensitive lookup
+	lowerHeaders := make(map[string][]string)
+	for k, v := range headers {
+		lowerHeaders[strings.ToLower(k)] = v
+	}
+
+	var token jwt.Token
+	var err error
+
+	// Check for JWT in Authorization header
+	if authHeaders, found := lowerHeaders["authorization"]; found && len(authHeaders) > 0 {
+		token, err = a.extractAndParseJWT(authHeaders[0])
+		if err != nil {
+			a.logger.Debug("failed to parse JWT from authorization header", zap.Error(err))
+			return ctx, fmt.Errorf("invalid JWT token: %w", err)
+		}
+
+		// Check if token needs reissue
+		if a.needsReissue(token) {
+			// Extract the actual JWT string from the authorization header
+			tokenString := authHeaders[0]
+			if strings.HasPrefix(strings.ToLower(tokenString), "bearer ") {
+				tokenString = tokenString[7:] // Remove "Bearer " prefix
+			}
+
+			newToken, err := a.reissueJWT(ctx, tokenString)
+			if err != nil {
+				a.logger.Warn("failed to reissue JWT, continuing with existing token", zap.Error(err))
+			} else {
+				token = newToken
+			}
+		}
+	} else if apiKeyHeaders, found := lowerHeaders["x-api-key"]; found && len(apiKeyHeaders) > 0 {
+		// Handle API key by issuing a new JWT
+		token, err = a.issueJWTFromAPIKey(ctx, apiKeyHeaders[0])
+		if err != nil {
+			a.logger.Debug("failed to issue JWT from API key", zap.Error(err))
+			return ctx, fmt.Errorf("failed to authenticate with API key: %w", err)
+		}
+	} else {
+		return ctx, fmt.Errorf("required authorization token not found. Please provide a valid JWT token via 'authorization' header or an API key via 'x-api-key' header")
+	}
+
+	// Extract claims from JWT and add to context
+	ctx = a.addClaimsToContext(ctx, token, ipAddress)
+
+	return ctx, nil
+}
+
+func (a *authenticator) extractAndParseJWT(authHeader string) (jwt.Token, error) {
+	authHeaderParts := strings.Fields(authHeader)
+
+	var tokenString string
+	switch len(authHeaderParts) {
+	case 1:
+		tokenString = authHeaderParts[0]
+	case 2:
+		if strings.ToLower(authHeaderParts[0]) != "bearer" {
+			return nil, fmt.Errorf("authorization header format must be Bearer {token}")
+		}
+		tokenString = authHeaderParts[1]
+	default:
+		return nil, fmt.Errorf("authorization header format must be Bearer {token}")
+	}
+
+	return a.ParseJWT(tokenString)
+}
+
+func (a *authenticator) ParseJWT(tokenString string) (jwt.Token, error) {
+	token, err := jwt.Parse([]byte(tokenString), jwt.WithKeySet(a.jwkSet))
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
+func (a *authenticator) issueJWTFromAPIKey(ctx context.Context, apiKey string) (jwt.Token, error) {
+	// Prepare the request body
+	requestBody := map[string]string{
+		"api_key": apiKey,
+	}
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Create the HTTP request
+	req, err := http.NewRequestWithContext(ctx, "POST", a.config.IssueURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Send the request
+	resp, err := a.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call issue endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read the response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("issue endpoint returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse the response to get the JWT
+	var issueResponse struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(body, &issueResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse issue response: %w", err)
+	}
+
+	// Parse and return the JWT
+	return a.ParseJWT(issueResponse.Token)
+}
+
+func (a *authenticator) reissueJWT(ctx context.Context, tokenString string) (jwt.Token, error) {
+	// Prepare the request body with the JWT string
+	requestBody := map[string]string{
+		"jwt": tokenString,
+	}
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal reissue request: %w", err)
+	}
+
+	// Prepare the request
+	req, err := http.NewRequestWithContext(ctx, "POST", a.config.ReissueURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create reissue request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if a.config.Key != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.config.Key))
+	}
+
+	// Send the request
+	resp, err := a.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call reissue endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read the response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read reissue response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("reissue endpoint returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse the response to get the new JWT
+	var reissueResponse struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(body, &reissueResponse); err != nil {
+		// If parsing as JSON fails, assume the response is the raw token
+		return a.ParseJWT(string(body))
+	}
+
+	// Parse and return the new JWT
+	return a.ParseJWT(reissueResponse.Token)
+}
+
+func (a *authenticator) needsReissue(token jwt.Token) bool {
+	return uint64(time.Since(token.IssuedAt()).Seconds()) > a.config.ReissueJWTAgeSecs
+}
+
+func (a *authenticator) addClaimsToContext(ctx context.Context, token jwt.Token, ipAddress string) context.Context {
+	// Extract common claims from JWT
+	claims := token.PrivateClaims()
+
+	// Create trusted headers map
+	trustedHeaders := make(dauth.TrustedHeaders)
+
+	// Add standard headers
+	if userID, ok := getClaimAsString(claims, "user_id"); ok {
+		trustedHeaders[dauth.SFHeaderUserID] = userID
+	} else if subject := token.Subject(); subject != "" {
+		// Legacy support: extract user ID from subject if it starts with "uid:"
+		if strings.HasPrefix(subject, "uid:") {
+			trustedHeaders[dauth.SFHeaderUserID] = strings.TrimPrefix(subject, "uid:")
+		}
+	}
+
+	if apiKeyID, ok := getClaimAsString(claims, "api_key_id"); ok {
+		trustedHeaders[dauth.SFHeaderApiKeyID] = apiKeyID
+	}
+
+	// Add IP address
+	trustedHeaders[dauth.SFHeaderIP] = ipAddress
+
+	// Add feature configs from JWT claims
+	if featureConfigs, ok := claims["feature_configs"].(map[string]interface{}); ok {
+		for key, value := range featureConfigs {
+			headerKey := jwtFeatureConfigKeyToHeader(key)
+			if strValue, ok := value.(string); ok {
+				trustedHeaders[headerKey] = strValue
+			}
+		}
+	}
+
+	// Add trusted headers to context
+	return dauth.WithTrustedHeaders(ctx, trustedHeaders)
+}
+
+func getClaimAsString(claims map[string]interface{}, key string) (string, bool) {
+	if val, exists := claims[key]; exists {
+		if strVal, ok := val.(string); ok {
+			return strVal, true
+		}
+	}
+	return "", false
+}
+
+func jwtFeatureConfigKeyToHeader(featureConfigKey string) string {
+	return "x-sf-" + strings.Replace(strings.ToLower(featureConfigKey), "_", "-", -1)
+}
+
+func (a *authenticator) Ready(ctx context.Context) bool {
+	return true
+}
