@@ -2,95 +2,468 @@ package auth
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jws"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/streamingfast/dauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
-func TestAuthenticator_ParseJWT(t *testing.T) {
-	// Create a test key
-	key, err := jwk.New([]byte("test-secret-key"))
-	require.NoError(t, err)
-	err = key.Set(jwk.AlgorithmKey, jwa.HS256)
-	require.NoError(t, err)
-	err = key.Set(jwk.KeyIDKey, "test-key-id")
-	require.NoError(t, err)
-
-	set := jwk.NewSet()
-	set.Add(key)
-
-	// Create authenticator with test key set
-	auth := &authenticator{
-		config: &Config{
-			ReissueJWTAgeSecs: 600,
-		},
-		logger: zap.NewNop(),
-		jwkSet: set,
+// Test helper functions
+func generateTestKeyPair() (*ecdsa.PrivateKey, *ecdsa.PublicKey, error) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, nil, err
 	}
-
-	// Create a test token
-	token := jwt.New()
-	token.Set(jwt.SubjectKey, "user:123")
-	token.Set(jwt.IssuedAtKey, time.Now())
-	token.Set(jwt.ExpirationKey, time.Now().Add(time.Hour))
-	token.Set("api_key_id", "test-api-key")
-	token.Set("user_id", "user-123")
-
-	// Sign the token with key ID
-	hdrs := jws.NewHeaders()
-	hdrs.Set(jws.KeyIDKey, "test-key-id")
-	signed, err := jwt.Sign(token, jwa.HS256, key, jwt.WithHeaders(hdrs))
-	require.NoError(t, err)
-
-	// Test parsing
-	parsed, err := auth.ParseJWT(string(signed))
-	require.NoError(t, err)
-	assert.Equal(t, "user:123", parsed.Subject())
-
-	// Verify custom claims
-	claims := parsed.PrivateClaims()
-	assert.Equal(t, "test-api-key", claims["api_key_id"])
-	assert.Equal(t, "user-123", claims["user_id"])
+	return privateKey, &privateKey.PublicKey, nil
 }
 
-func TestAuthenticator_NeedsReissue(t *testing.T) {
-	auth := &authenticator{
-		config: &Config{
-			ReissueJWTAgeSecs: 60, // 1 minute
+func createTestJWKSet(publicKey *ecdsa.PublicKey) (jwk.Set, error) {
+	key, err := jwk.Import(publicKey)
+	if err != nil {
+		return nil, err
+	}
+	key.Set(jwk.AlgorithmKey, jwa.ES256())
+	key.Set(jwk.KeyIDKey, "test-key-id")
+
+	set := jwk.NewSet()
+	set.AddKey(key)
+	return set, nil
+}
+
+func createTestJWT(privateKey *ecdsa.PrivateKey, claims map[string]interface{}) (string, error) {
+	token := jwt.New()
+
+	// Set standard claims
+	token.Set(jwt.IssuedAtKey, time.Now())
+	token.Set(jwt.ExpirationKey, time.Now().Add(time.Hour))
+
+	// Set custom claims
+	for key, value := range claims {
+		token.Set(key, value)
+	}
+
+	key, err := jwk.Import(privateKey)
+	if err != nil {
+		return "", err
+	}
+
+	signed, err := jwt.Sign(token, jwt.WithKey(jwa.ES256(), key))
+	if err != nil {
+		return "", err
+	}
+
+	return string(signed), nil
+}
+
+func TestRegister(t *testing.T) {
+	// Test that Register function properly registers the authenticator
+	Register()
+
+	// This test mainly ensures Register doesn't panic
+	// The actual registration is tested through integration with dauth
+}
+
+func TestNew(t *testing.T) {
+	logger := zap.NewNop()
+
+	tests := []struct {
+		name      string
+		config    *Config
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name: "valid config with PubKeyURL",
+			config: &Config{
+				PubKeyURL:         "https://example.com/jwks",
+				ReissueJWTAgeSecs: 600,
+				ReissueURL:        "https://auth.example.com/v1/auth/reissue",
+				IssueURL:          "https://auth.example.com/v1/auth/issue",
+			},
+			wantError: false,
 		},
-		logger: zap.NewNop(),
+		{
+			name: "valid config with PubKeyBase64",
+			config: &Config{
+				PubKeyBase64:      base64.StdEncoding.EncodeToString([]byte(`{"keys":[]}`)),
+				ReissueJWTAgeSecs: 600,
+				ReissueURL:        "https://auth.example.com/v1/auth/reissue",
+				IssueURL:          "https://auth.example.com/v1/auth/issue",
+			},
+			wantError: false,
+		},
+		{
+			name: "missing both PubKeyURL and PubKeyBase64",
+			config: &Config{
+				ReissueJWTAgeSecs: 600,
+				ReissueURL:        "https://auth.example.com/v1/auth/reissue",
+				IssueURL:          "https://auth.example.com/v1/auth/issue",
+			},
+			wantError: true,
+			errorMsg:  "no JWK URL or public key URL provided",
+		},
+		{
+			name: "invalid PubKeyBase64",
+			config: &Config{
+				PubKeyBase64:      "invalid-base64!@#",
+				ReissueJWTAgeSecs: 600,
+				ReissueURL:        "https://auth.example.com/v1/auth/reissue",
+				IssueURL:          "https://auth.example.com/v1/auth/issue",
+			},
+			wantError: true,
+			errorMsg:  "failed to fetch JWK set",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// For PubKeyURL test, create a test server
+			if tt.config.PubKeyURL != "" {
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					w.Write([]byte(`{"keys":[]}`))
+				}))
+				defer server.Close()
+				tt.config.PubKeyURL = server.URL
+			}
+
+			auth, err := new(tt.config, logger)
+
+			if tt.wantError {
+				assert.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+				assert.Nil(t, auth)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, auth)
+			}
+		})
+	}
+}
+
+func TestAuthenticator_Authenticate(t *testing.T) {
+	logger := zap.NewNop()
+	privateKey, publicKey, err := generateTestKeyPair()
+	require.NoError(t, err)
+
+	jwkSet, err := createTestJWKSet(publicKey)
+	require.NoError(t, err)
+
+	// Create test JWT with various claims
+	validJWT, err := createTestJWT(privateKey, map[string]interface{}{
+		"user_id":    "test-user-123",
+		"api_key_id": "api-key-456",
+		"plan_tier":  "premium",
+		"feature_configs": map[string]interface{}{
+			"max_requests": "1000",
+			"enable_beta":  "true",
+		},
+	})
+	require.NoError(t, err)
+
+	// Create old JWT that needs reissue
+	oldToken := jwt.New()
+	oldToken.Set(jwt.IssuedAtKey, time.Now().Add(-time.Hour))
+	oldToken.Set(jwt.ExpirationKey, time.Now().Add(time.Hour))
+	oldToken.Set("user_id", "old-user")
+
+	key, _ := jwk.Import(privateKey)
+	signedOld, _ := jwt.Sign(oldToken, jwt.WithKey(jwa.ES256(), key))
+	oldJWT := string(signedOld)
+
+	tests := []struct {
+		name            string
+		headers         map[string][]string
+		setupMockServer func() *httptest.Server
+		wantError       bool
+		errorMsg        string
+		checkContext    func(t *testing.T, ctx context.Context)
+	}{
+		{
+			name: "valid JWT in Authorization header with Bearer prefix",
+			headers: map[string][]string{
+				"Authorization": {fmt.Sprintf("Bearer %s", validJWT)},
+			},
+			wantError: false,
+			checkContext: func(t *testing.T, ctx context.Context) {
+				headers := dauth.FromContext(ctx)
+				assert.Equal(t, "test-user-123", headers[dauth.SFHeaderUserID])
+				assert.Equal(t, "api-key-456", headers[dauth.SFHeaderApiKeyID])
+				assert.Equal(t, "premium", headers[dauth.SFHeaderPlanTier])
+				assert.Equal(t, "1000", headers["x-sf-max-requests"])
+				assert.Equal(t, "true", headers["x-sf-enable-beta"])
+			},
+		},
+		{
+			name: "valid JWT in Authorization header without Bearer prefix",
+			headers: map[string][]string{
+				"authorization": {validJWT},
+			},
+			wantError: false,
+			checkContext: func(t *testing.T, ctx context.Context) {
+				headers := dauth.FromContext(ctx)
+				assert.Equal(t, "test-user-123", headers[dauth.SFHeaderUserID])
+			},
+		},
+		{
+			name: "invalid JWT in Authorization header",
+			headers: map[string][]string{
+				"Authorization": {"Bearer invalid-jwt-token"},
+			},
+			wantError: true,
+			errorMsg:  "invalid JWT token",
+		},
+		{
+			name: "API key authentication",
+			headers: map[string][]string{
+				"X-API-Key": {"test-api-key"},
+			},
+			setupMockServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					// Verify request
+					assert.Equal(t, "POST", r.Method)
+					assert.Equal(t, "/v1/auth/issue", r.URL.Path)
+
+					var body map[string]string
+					json.NewDecoder(r.Body).Decode(&body)
+					assert.Equal(t, "test-api-key", body["api_key"])
+
+					// Return JWT
+					response := map[string]string{
+						"token": validJWT,
+					}
+					json.NewEncoder(w).Encode(response)
+				}))
+			},
+			wantError: false,
+			checkContext: func(t *testing.T, ctx context.Context) {
+				headers := dauth.FromContext(ctx)
+				assert.Equal(t, "test-user-123", headers[dauth.SFHeaderUserID])
+			},
+		},
+		{
+			name: "API key authentication failure",
+			headers: map[string][]string{
+				"X-API-Key": {"invalid-api-key"},
+			},
+			setupMockServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusUnauthorized)
+					w.Write([]byte("Invalid API key"))
+				}))
+			},
+			wantError: true,
+			errorMsg:  "failed to authenticate with API key",
+		},
+		{
+			name:      "missing authentication headers",
+			headers:   map[string][]string{},
+			wantError: true,
+			errorMsg:  "required authorization token not found",
+		},
+		{
+			name: "JWT reissue on old token",
+			headers: map[string][]string{
+				"Authorization": {fmt.Sprintf("Bearer %s", oldJWT)},
+			},
+			setupMockServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/v1/auth/reissue" {
+						// Return new JWT
+						response := map[string]string{
+							"token": validJWT,
+						}
+						json.NewEncoder(w).Encode(response)
+					}
+				}))
+			},
+			wantError: false,
+			checkContext: func(t *testing.T, ctx context.Context) {
+				headers := dauth.FromContext(ctx)
+				// Should have claims from the new reissued token
+				assert.Equal(t, "test-user-123", headers[dauth.SFHeaderUserID])
+			},
+		},
+		{
+			name: "case insensitive header lookup",
+			headers: map[string][]string{
+				"AUTHORIZATION": {fmt.Sprintf("Bearer %s", validJWT)},
+			},
+			wantError: false,
+			checkContext: func(t *testing.T, ctx context.Context) {
+				headers := dauth.FromContext(ctx)
+				assert.Equal(t, "test-user-123", headers[dauth.SFHeaderUserID])
+			},
+		},
+		{
+			name: "invalid Bearer format",
+			headers: map[string][]string{
+				"Authorization": {"NotBearer " + validJWT},
+			},
+			wantError: true,
+			errorMsg:  "authorization header format must be Bearer",
+		},
+		{
+			name: "multiple authorization parts",
+			headers: map[string][]string{
+				"Authorization": {"Bearer token extra parts"},
+			},
+			wantError: true,
+			errorMsg:  "authorization header format must be Bearer",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &Config{
+				ReissueJWTAgeSecs: 300, // 5 minutes
+				ReissueURL:        "https://auth.example.com/v1/auth/reissue",
+				IssueURL:          "https://auth.example.com/v1/auth/issue",
+			}
+
+			// Setup mock server if needed
+			if tt.setupMockServer != nil {
+				server := tt.setupMockServer()
+				defer server.Close()
+				config.IssueURL = server.URL + "/v1/auth/issue"
+				config.ReissueURL = server.URL + "/v1/auth/reissue"
+			}
+
+			auth := &authenticator{
+				config:     config,
+				logger:     logger,
+				jwkSet:     jwkSet,
+				httpClient: &http.Client{Timeout: 15 * time.Second},
+			}
+
+			ctx := context.Background()
+			newCtx, err := auth.Authenticate(ctx, "/test/path", tt.headers, "192.168.1.1")
+
+			if tt.wantError {
+				assert.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, newCtx)
+
+				if tt.checkContext != nil {
+					tt.checkContext(t, newCtx)
+				}
+
+				// Check IP address is always added
+				headers := dauth.FromContext(newCtx)
+				assert.Equal(t, "192.168.1.1", headers[dauth.SFHeaderIP])
+			}
+		})
+	}
+}
+
+func TestAuthenticator_ParseJWT(t *testing.T) {
+	logger := zap.NewNop()
+	privateKey, publicKey, err := generateTestKeyPair()
+	require.NoError(t, err)
+
+	jwkSet, err := createTestJWKSet(publicKey)
+	require.NoError(t, err)
+
+	validJWT, err := createTestJWT(privateKey, map[string]interface{}{
+		"user_id": "test-user",
+	})
+	require.NoError(t, err)
+
+	// Create JWT with different key
+	differentKey, _, _ := generateTestKeyPair()
+	invalidJWT, _ := createTestJWT(differentKey, map[string]interface{}{
+		"user_id": "test-user",
+	})
+
+	auth := &authenticator{
+		config: &Config{},
+		logger: logger,
+		jwkSet: jwkSet,
 	}
 
 	tests := []struct {
-		name     string
-		issuedAt time.Time
-		want     bool
+		name      string
+		token     string
+		wantError bool
 	}{
 		{
-			name:     "token issued just now",
-			issuedAt: time.Now(),
-			want:     false,
+			name:      "valid JWT",
+			token:     validJWT,
+			wantError: false,
 		},
 		{
-			name:     "token issued 30 seconds ago",
-			issuedAt: time.Now().Add(-30 * time.Second),
-			want:     false,
+			name:      "invalid JWT signature",
+			token:     invalidJWT,
+			wantError: true,
 		},
 		{
-			name:     "token issued 2 minutes ago",
-			issuedAt: time.Now().Add(-2 * time.Minute),
-			want:     true,
+			name:      "malformed JWT",
+			token:     "not.a.jwt",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			token, err := auth.ParseJWT(tt.token)
+
+			if tt.wantError {
+				assert.Error(t, err)
+				assert.Nil(t, token)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, token)
+			}
+		})
+	}
+}
+
+func TestAuthenticator_needsReissue(t *testing.T) {
+	auth := &authenticator{
+		config: &Config{
+			ReissueJWTAgeSecs: 600, // 10 minutes
+		},
+	}
+
+	tests := []struct {
+		name          string
+		issuedAt      time.Time
+		expectReissue bool
+	}{
+		{
+			name:          "token within reissue age",
+			issuedAt:      time.Now().Add(-5 * time.Minute),
+			expectReissue: false,
+		},
+		{
+			name:          "token exceeds reissue age",
+			issuedAt:      time.Now().Add(-15 * time.Minute),
+			expectReissue: true,
+		},
+		{
+			name:          "token at exact reissue age",
+			issuedAt:      time.Now().Add(-10 * time.Minute),
+			expectReissue: false,
 		},
 	}
 
@@ -99,282 +472,422 @@ func TestAuthenticator_NeedsReissue(t *testing.T) {
 			token := jwt.New()
 			token.Set(jwt.IssuedAtKey, tt.issuedAt)
 
-			got := auth.needsReissue(token)
-			assert.Equal(t, tt.want, got)
+			result := auth.needsReissue(token)
+			assert.Equal(t, tt.expectReissue, result)
 		})
 	}
 }
 
-func TestAuthenticator_ExtractAndParseJWT(t *testing.T) {
-	// Create a test key
-	key, err := jwk.New([]byte("test-secret-key"))
-	require.NoError(t, err)
-	err = key.Set(jwk.AlgorithmKey, jwa.HS256)
-	require.NoError(t, err)
-	err = key.Set(jwk.KeyIDKey, "test-key-id")
-	require.NoError(t, err)
+func TestAuthenticator_addClaimsToContext(t *testing.T) {
+	auth := &authenticator{
+		config: &Config{},
+	}
 
-	set := jwk.NewSet()
-	set.Add(key)
+	tests := []struct {
+		name      string
+		claims    map[string]interface{}
+		ipAddress string
+		expected  map[string]string
+	}{
+		{
+			name: "standard claims",
+			claims: map[string]interface{}{
+				"user_id":    "user123",
+				"api_key_id": "key456",
+				"plan_tier":  "premium",
+			},
+			ipAddress: "10.0.0.1",
+			expected: map[string]string{
+				dauth.SFHeaderUserID:   "user123",
+				dauth.SFHeaderApiKeyID: "key456",
+				dauth.SFHeaderPlanTier: "premium",
+				dauth.SFHeaderIP:       "10.0.0.1",
+			},
+		},
+		{
+			name: "legacy subject with uid prefix",
+			claims: map[string]interface{}{
+				jwt.SubjectKey: "uid:legacy-user",
+			},
+			ipAddress: "10.0.0.2",
+			expected: map[string]string{
+				dauth.SFHeaderUserID: "legacy-user",
+				dauth.SFHeaderIP:     "10.0.0.2",
+			},
+		},
+		{
+			name: "feature configs",
+			claims: map[string]interface{}{
+				"feature_configs": map[string]interface{}{
+					"max_requests":     "1000",
+					"enable_feature_x": "true",
+					"rate_limit":       "500",
+				},
+			},
+			ipAddress: "10.0.0.3",
+			expected: map[string]string{
+				"x-sf-max-requests":     "1000",
+				"x-sf-enable-feature-x": "true",
+				"x-sf-rate-limit":       "500",
+				dauth.SFHeaderIP:        "10.0.0.3",
+			},
+		},
+	}
 
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			token := jwt.New()
+			for key, value := range tt.claims {
+				token.Set(key, value)
+			}
+
+			ctx := context.Background()
+			newCtx := auth.addClaimsToContext(ctx, token, tt.ipAddress)
+
+			headers := dauth.FromContext(newCtx)
+
+			for key, expectedValue := range tt.expected {
+				assert.Equal(t, expectedValue, headers[key], "header %s mismatch", key)
+			}
+		})
+	}
+}
+
+func TestJwtFeatureConfigKeyToHeader(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{
+			input:    "max_requests",
+			expected: "x-sf-max-requests",
+		},
+		{
+			input:    "ENABLE_FEATURE",
+			expected: "x-sf-enable-feature",
+		},
+		{
+			input:    "rate_limit_per_second",
+			expected: "x-sf-rate-limit-per-second",
+		},
+		{
+			input:    "simple",
+			expected: "x-sf-simple",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := jwtFeatureConfigKeyToHeader(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestAuthenticator_Ready(t *testing.T) {
 	auth := &authenticator{
 		config: &Config{},
 		logger: zap.NewNop(),
-		jwkSet: set,
-	}
-
-	// Create a test token
-	token := jwt.New()
-	token.Set(jwt.SubjectKey, "user:123")
-	token.Set(jwt.IssuedAtKey, time.Now())
-
-	// Sign the token with key ID
-	hdrs := jws.NewHeaders()
-	hdrs.Set(jws.KeyIDKey, "test-key-id")
-	signed, err := jwt.Sign(token, jwa.HS256, key, jwt.WithHeaders(hdrs))
-	require.NoError(t, err)
-	tokenString := string(signed)
-
-	tests := []struct {
-		name      string
-		header    string
-		wantErr   bool
-		errString string
-	}{
-		{
-			name:    "valid bearer token",
-			header:  "Bearer " + tokenString,
-			wantErr: false,
-		},
-		{
-			name:    "valid token without bearer",
-			header:  tokenString,
-			wantErr: false,
-		},
-		{
-			name:      "invalid bearer format",
-			header:    "Basic " + tokenString,
-			wantErr:   true,
-			errString: "authorization header format must be Bearer {token}",
-		},
-		{
-			name:      "too many parts",
-			header:    "Bearer " + tokenString + " extra",
-			wantErr:   true,
-			errString: "authorization header format must be Bearer {token}",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := auth.extractAndParseJWT(tt.header)
-			if tt.wantErr {
-				assert.Error(t, err)
-				if tt.errString != "" {
-					assert.Contains(t, err.Error(), tt.errString)
-				}
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestAuthenticator_IssueJWTFromAPIKey(t *testing.T) {
-	// Create a test key
-	key, err := jwk.New([]byte("test-secret-key"))
-	require.NoError(t, err)
-	err = key.Set(jwk.AlgorithmKey, jwa.HS256)
-	require.NoError(t, err)
-	err = key.Set(jwk.KeyIDKey, "test-key-id")
-	require.NoError(t, err)
-
-	set := jwk.NewSet()
-	set.Add(key)
-
-	// Create a valid test token for the mock response
-	mockToken := jwt.New()
-	mockToken.Set("api_key_id", "test-api-key")
-	mockToken.Set("user_id", "user-123")
-	mockToken.Set(jwt.IssuedAtKey, time.Now())
-	mockToken.Set(jwt.ExpirationKey, time.Now().Add(time.Hour))
-
-	// Sign the mock token with key ID
-	hdrs := jws.NewHeaders()
-	hdrs.Set(jws.KeyIDKey, "test-key-id")
-	signed, err := jwt.Sign(mockToken, jwa.HS256, key, jwt.WithHeaders(hdrs))
-	require.NoError(t, err)
-	tokenString := string(signed)
-
-	// Create a mock server for the issue endpoint
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/v1/auth/issue", r.URL.Path)
-		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-
-		// Return a mock JWT response
-		w.Header().Set("Content-Type", "application/json")
-		response := map[string]string{"token": tokenString}
-		json.NewEncoder(w).Encode(response)
-	}))
-	defer server.Close()
-
-	auth := &authenticator{
-		config: &Config{
-			IssueURL: server.URL + "/v1/auth/issue",
-		},
-		logger:     zap.NewNop(),
-		jwkSet:     set,
-		httpClient: &http.Client{Timeout: 5 * time.Second},
 	}
 
 	ctx := context.Background()
-	token, err := auth.issueJWTFromAPIKey(ctx, "test-api-key")
-	require.NoError(t, err)
-	assert.NotNil(t, token)
-
-	// Verify the token contains expected claims
-	claims := token.PrivateClaims()
-	assert.Equal(t, "test-api-key", claims["api_key_id"])
-	assert.Equal(t, "user-123", claims["user_id"])
+	assert.True(t, auth.Ready(ctx))
 }
 
-func TestAuthenticator_Authenticate(t *testing.T) {
-	// Create a test key
-	key, err := jwk.New([]byte("test-secret-key"))
-	require.NoError(t, err)
-	err = key.Set(jwk.AlgorithmKey, jwa.HS256)
-	require.NoError(t, err)
-	err = key.Set(jwk.KeyIDKey, "test-key-id")
+func TestAuthenticator_issueJWTFromAPIKey(t *testing.T) {
+	logger := zap.NewNop()
+	privateKey, publicKey, err := generateTestKeyPair()
 	require.NoError(t, err)
 
-	set := jwk.NewSet()
-	set.Add(key)
+	jwkSet, err := createTestJWKSet(publicKey)
+	require.NoError(t, err)
 
-	// Create a valid test token
-	token := jwt.New()
-	token.Set(jwt.SubjectKey, "uid:user-123")
-	token.Set(jwt.IssuedAtKey, time.Now())
-	token.Set(jwt.ExpirationKey, time.Now().Add(time.Hour))
-	token.Set("api_key_id", "test-api-key")
-	token.Set("user_id", "user-123")
-
-	// Add feature configs
-	token.Set("feature_configs", map[string]interface{}{
-		"SUBSTREAMS_PARALLEL_JOBS": "10",
+	validJWT, err := createTestJWT(privateKey, map[string]interface{}{
+		"user_id": "api-user",
 	})
-
-	// Sign the token with key ID
-	hdrs := jws.NewHeaders()
-	hdrs.Set(jws.KeyIDKey, "test-key-id")
-	signed, err := jwt.Sign(token, jwa.HS256, key, jwt.WithHeaders(hdrs))
 	require.NoError(t, err)
-	tokenString := string(signed)
-
-	auth := &authenticator{
-		config: &Config{
-			ReissueJWTAgeSecs: 3600, // Don't trigger reissue
-		},
-		logger:     zap.NewNop(),
-		jwkSet:     set,
-		httpClient: &http.Client{},
-	}
 
 	tests := []struct {
-		name      string
-		headers   map[string][]string
-		ipAddress string
-		wantErr   bool
-		checkCtx  func(t *testing.T, ctx context.Context)
+		name       string
+		apiKey     string
+		mockServer func() *httptest.Server
+		wantError  bool
+		errorMsg   string
 	}{
 		{
-			name: "valid JWT in authorization header",
-			headers: map[string][]string{
-				"Authorization": {"Bearer " + tokenString},
+			name:   "successful API key exchange",
+			apiKey: "valid-api-key",
+			mockServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					assert.Equal(t, "POST", r.Method)
+					assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+					var body map[string]string
+					json.NewDecoder(r.Body).Decode(&body)
+					assert.Equal(t, "valid-api-key", body["api_key"])
+
+					response := map[string]string{
+						"token": validJWT,
+					}
+					json.NewEncoder(w).Encode(response)
+				}))
 			},
-			ipAddress: "192.168.1.1",
-			wantErr:   false,
-			checkCtx: func(t *testing.T, ctx context.Context) {
-				// Check that context has the expected values
-				headers := dauth.FromContext(ctx)
-				assert.Equal(t, "user-123", headers[dauth.SFHeaderUserID])
-				assert.Equal(t, "test-api-key", headers[dauth.SFHeaderApiKeyID])
-				assert.Equal(t, "192.168.1.1", headers[dauth.SFHeaderIP])
-				assert.Equal(t, "10", headers["x-sf-substreams-parallel-jobs"])
-			},
+			wantError: false,
 		},
 		{
-			name: "no auth headers",
-			headers: map[string][]string{
-				"Content-Type": {"application/json"},
+			name:   "API key rejection",
+			apiKey: "invalid-api-key",
+			mockServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusUnauthorized)
+					w.Write([]byte("Invalid API key"))
+				}))
 			},
-			ipAddress: "192.168.1.1",
-			wantErr:   true,
+			wantError: true,
+			errorMsg:  "issue endpoint returned status 401",
+		},
+		{
+			name:   "server error",
+			apiKey: "any-key",
+			mockServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte("Server error"))
+				}))
+			},
+			wantError: true,
+			errorMsg:  "issue endpoint returned status 500",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			server := tt.mockServer()
+			defer server.Close()
+
+			auth := &authenticator{
+				config: &Config{
+					IssueURL: server.URL,
+				},
+				logger:     logger,
+				jwkSet:     jwkSet,
+				httpClient: &http.Client{Timeout: 15 * time.Second},
+			}
+
 			ctx := context.Background()
-			newCtx, err := auth.Authenticate(ctx, "/test", tt.headers, tt.ipAddress)
+			token, err := auth.issueJWTFromAPIKey(ctx, tt.apiKey)
 
-			if tt.wantErr {
+			if tt.wantError {
 				assert.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+				assert.Nil(t, token)
 			} else {
 				assert.NoError(t, err)
-				if tt.checkCtx != nil {
-					tt.checkCtx(t, newCtx)
-				}
+				assert.NotNil(t, token)
 			}
 		})
 	}
 }
 
-func TestAuthenticator_AddClaimsToContext(t *testing.T) {
-	auth := &authenticator{
-		logger: zap.NewNop(),
+func TestAuthenticator_reissueJWT(t *testing.T) {
+	logger := zap.NewNop()
+	privateKey, publicKey, err := generateTestKeyPair()
+	require.NoError(t, err)
+
+	jwkSet, err := createTestJWKSet(publicKey)
+	require.NoError(t, err)
+
+	oldJWT, err := createTestJWT(privateKey, map[string]interface{}{
+		"user_id": "old-user",
+	})
+	require.NoError(t, err)
+
+	newJWT, err := createTestJWT(privateKey, map[string]interface{}{
+		"user_id": "refreshed-user",
+	})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		tokenString string
+		configKey   string
+		mockServer  func() *httptest.Server
+		wantError   bool
+		errorMsg    string
+	}{
+		{
+			name:        "successful reissue with JSON response",
+			tokenString: oldJWT,
+			configKey:   "test-key",
+			mockServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					assert.Equal(t, "POST", r.Method)
+					assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+					assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
+
+					var body map[string]string
+					json.NewDecoder(r.Body).Decode(&body)
+					assert.Equal(t, oldJWT, body["jwt"])
+
+					response := map[string]string{
+						"token": newJWT,
+					}
+					json.NewEncoder(w).Encode(response)
+				}))
+			},
+			wantError: false,
+		},
+		{
+			name:        "successful reissue with raw token response",
+			tokenString: oldJWT,
+			configKey:   "",
+			mockServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					// No Authorization header when key is empty
+					assert.Empty(t, r.Header.Get("Authorization"))
+
+					w.Header().Set("Content-Type", "text/plain")
+					w.Write([]byte(newJWT))
+				}))
+			},
+			wantError: false,
+		},
+		{
+			name:        "reissue rejection",
+			tokenString: oldJWT,
+			configKey:   "test-key",
+			mockServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusUnauthorized)
+					w.Write([]byte("Token expired"))
+				}))
+			},
+			wantError: true,
+			errorMsg:  "reissue endpoint returned status 401",
+		},
+		{
+			name:        "server error during reissue",
+			tokenString: oldJWT,
+			configKey:   "test-key",
+			mockServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte("Internal server error"))
+				}))
+			},
+			wantError: true,
+			errorMsg:  "reissue endpoint returned status 500",
+		},
 	}
 
-	token := jwt.New()
-	token.Set(jwt.SubjectKey, "uid:legacy-user")
-	token.Set("user_id", "user-123")
-	token.Set("api_key_id", "api-key-456")
-	token.Set("feature_configs", map[string]interface{}{
-		"SUBSTREAMS_PARALLEL_JOBS": "5",
-		"INDEXER_IDENTIFIER":       "indexer-1",
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := tt.mockServer()
+			defer server.Close()
 
-	ctx := context.Background()
-	newCtx := auth.addClaimsToContext(ctx, token, "10.0.0.1")
+			auth := &authenticator{
+				config: &Config{
+					ReissueURL: server.URL,
+					Key:        tt.configKey,
+				},
+				logger:     logger,
+				jwkSet:     jwkSet,
+				httpClient: &http.Client{Timeout: 15 * time.Second},
+			}
 
-	// Get headers from context
-	headers := dauth.FromContext(newCtx)
+			ctx := context.Background()
+			token, err := auth.reissueJWT(ctx, tt.tokenString)
 
-	// Check standard headers
-	assert.Equal(t, "user-123", headers[dauth.SFHeaderUserID])
-	assert.Equal(t, "api-key-456", headers[dauth.SFHeaderApiKeyID])
-	assert.Equal(t, "10.0.0.1", headers[dauth.SFHeaderIP])
-
-	// Check feature configs
-	assert.Equal(t, "5", headers["x-sf-substreams-parallel-jobs"])
-	assert.Equal(t, "indexer-1", headers["x-sf-indexer-identifier"])
+			if tt.wantError {
+				assert.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+				assert.Nil(t, token)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, token)
+			}
+		})
+	}
 }
 
-func TestAuthenticator_AddClaimsToContext_LegacyUserID(t *testing.T) {
+func TestAuthenticator_extractAndParseJWT(t *testing.T) {
+	logger := zap.NewNop()
+	privateKey, publicKey, err := generateTestKeyPair()
+	require.NoError(t, err)
+
+	jwkSet, err := createTestJWKSet(publicKey)
+	require.NoError(t, err)
+
+	validJWT, err := createTestJWT(privateKey, map[string]interface{}{
+		"user_id": "test-user",
+	})
+	require.NoError(t, err)
+
 	auth := &authenticator{
-		logger: zap.NewNop(),
+		config: &Config{},
+		logger: logger,
+		jwkSet: jwkSet,
 	}
 
-	// Test with legacy uid: prefix in subject
-	token := jwt.New()
-	token.Set(jwt.SubjectKey, "uid:legacy-user-789")
-	token.Set("api_key_id", "api-key-456")
+	tests := []struct {
+		name       string
+		authHeader string
+		wantError  bool
+		errorMsg   string
+	}{
+		{
+			name:       "valid Bearer token",
+			authHeader: fmt.Sprintf("Bearer %s", validJWT),
+			wantError:  false,
+		},
+		{
+			name:       "valid Bearer token with lowercase",
+			authHeader: fmt.Sprintf("bearer %s", validJWT),
+			wantError:  false,
+		},
+		{
+			name:       "token without Bearer prefix",
+			authHeader: validJWT,
+			wantError:  false,
+		},
+		{
+			name:       "invalid Bearer prefix",
+			authHeader: fmt.Sprintf("Basic %s", validJWT),
+			wantError:  true,
+			errorMsg:   "authorization header format must be Bearer",
+		},
+		{
+			name:       "too many parts in header",
+			authHeader: "Bearer token extra",
+			wantError:  true,
+			errorMsg:   "authorization header format must be Bearer",
+		},
+		{
+			name:       "empty header",
+			authHeader: "",
+			wantError:  true,
+			errorMsg:   "authorization header format must be Bearer",
+		},
+	}
 
-	ctx := context.Background()
-	newCtx := auth.addClaimsToContext(ctx, token, "10.0.0.1")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			token, err := auth.extractAndParseJWT(tt.authHeader)
 
-	// Get headers from context
-	headers := dauth.FromContext(newCtx)
-
-	// Should extract user ID from subject
-	assert.Equal(t, "legacy-user-789", headers[dauth.SFHeaderUserID])
+			if tt.wantError {
+				assert.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+				assert.Nil(t, token)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, token)
+			}
+		})
+	}
 }

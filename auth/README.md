@@ -66,7 +66,7 @@ import (
     "go.uber.org/zap"
 )
 
-config := "paymentgateway://auth.example.com?pubkeyurl=https://auth.example.com/.well-known/jwks.json"
+config := "paymentgateway://"
 logger := zap.NewLogger()
 
 authenticator, err := dauth.New(config, logger)
@@ -105,7 +105,7 @@ Pass an API key via the `X-API-Key` header. The authenticator will automatically
 
 ```go
 headers := map[string][]string{
-    "X-API-Key": {"sk_live_1234567890abcdef"},
+    "X-API-Key": {"server_1234567890abcdef"},
 }
 
 ctx, err := authenticator.Authenticate(context.Background(), "/api/endpoint", headers, "192.168.1.1")
@@ -116,7 +116,7 @@ ctx, err := authenticator.Authenticate(context.Background(), "/api/endpoint", he
 1. **Header Parsing**: The authenticator checks for either an `Authorization` header with a JWT token or an `X-API-Key` header
 2. **API Key Exchange**: If an API key is provided, it's sent to the issue endpoint to obtain a JWT token
 3. **JWT Validation**: The JWT token is validated against the configured JWK set
-4. **Token Reissue**: If the token is older than the configured threshold, it's automatically reissued
+4. **Token Reissue**: If the token is older than the configured threshold, it's automatically reissued (to ensure we have the latest parameters/features in it)
 5. **Context Enrichment**: Claims from the JWT are extracted and added to the context as trusted headers
 
 ## Trusted Headers
@@ -126,9 +126,10 @@ The following headers are automatically extracted from JWT claims and added to t
 - `x-sf-user-id`: User identifier
 - `x-sf-api-key-id`: API key identifier
 - `x-real-ip`: Client IP address
+- `x-sf-plan-tier`: one of "FREE", "SCALING", "PRO", "ENTERPRISE"
 - Feature configuration headers (e.g., `x-sf-substreams-parallel-jobs`)
 
-## External Endpoints
+## Issuance Endpoints
 
 The authenticator communicates with two external endpoints:
 
@@ -152,28 +153,3 @@ Used to exchange an API key for a JWT token.
 - **Optional Header**: `Authorization: Bearer [key]` (if configured)
 
 Used to obtain a new JWT token from an existing one that's approaching expiration.
-
-## Migration Notes
-
-This authenticator was migrated from an external library with the following changes:
-
-1. **Removed Dependencies**: Eliminated dependencies on `adminAPIClient` and rate limiting/cutoff functionality
-2. **Simplified Data Flow**: All required data is now extracted directly from JWT claims
-3. **Direct API Key Exchange**: API keys are immediately exchanged for JWT tokens via the issue endpoint
-4. **Streamlined Reissue**: Token reissue now sends the actual JWT string directly
-
-## Testing
-
-The package includes comprehensive unit tests. Run them with:
-
-```bash
-go test ./auth/...
-```
-
-## Security Considerations
-
-- Always use HTTPS in production (`plaintext=false`)
-- Enable certificate verification in production (`insecure=false`)
-- Protect the reissue key and API keys
-- Configure appropriate JWT expiration times
-- Regularly rotate JWK sets

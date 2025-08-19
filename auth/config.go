@@ -22,6 +22,7 @@ type Config struct {
 func newConfig(configURL string) (*Config, error) {
 	c := &Config{
 		Endpoint:          "auth.thegraph.market",
+		PubKeyURL:         "https://auth.thegraph.market/.well-known/jwks.json",
 		ReissueJWTAgeSecs: 600,
 		Insecure:          false,
 		Plaintext:         false,
@@ -59,12 +60,18 @@ func newConfig(configURL string) (*Config, error) {
 	}
 
 	c.Key = vals.Get("key")
-	c.PubKeyURL = vals.Get("pubkeyurl")
-	c.PubKeyBase64 = vals.Get("pubkeybase64")
 
-	// Validate that only one of PubKeyURL or PubKeyBase64 is provided
-	if c.PubKeyURL != "" && c.PubKeyBase64 != "" {
-		return nil, fmt.Errorf("only one of pubkeyurl or pubkeybase64 can be provided, not both")
+	keyURL := vals.Get("pubkeyurl")
+	keyBase64 := vals.Get("pubkeybase64")
+
+	if keyURL != "" {
+		c.PubKeyURL = keyURL
+		if keyBase64 != "" {
+			return nil, fmt.Errorf("only one of pubkeyurl or pubkeybase64 can be provided, not both")
+		}
+	}
+	if keyBase64 != "" {
+		c.PubKeyBase64 = keyBase64
 	}
 
 	// Parse reissue-jwt-max-age-secs if provided

@@ -11,8 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/streamingfast/dauth"
 	"go.uber.org/zap"
 )
@@ -134,11 +135,23 @@ func (a *authenticator) extractAndParseJWT(authHeader string) (jwt.Token, error)
 }
 
 func (a *authenticator) ParseJWT(tokenString string) (jwt.Token, error) {
-	token, err := jwt.Parse([]byte(tokenString), jwt.WithKeySet(a.jwkSet))
-	if err != nil {
-		return nil, err
+	var lastErr error
+	var token jwt.Token
+
+	for i := range a.jwkSet.Len() {
+		key, ok := a.jwkSet.Key(i)
+		if !ok {
+			break
+		}
+
+		tok, err := jwt.Parse([]byte(tokenString), jwt.WithKey(jwa.ES256(), key), jwt.WithValidate(true))
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		token = tok
 	}
-	return token, nil
+	return token, lastErr
 }
 
 func (a *authenticator) issueJWTFromAPIKey(ctx context.Context, apiKey string) (jwt.Token, error) {
@@ -238,27 +251,28 @@ func (a *authenticator) reissueJWT(ctx context.Context, tokenString string) (jwt
 }
 
 func (a *authenticator) needsReissue(token jwt.Token) bool {
-	return uint64(time.Since(token.IssuedAt()).Seconds()) > a.config.ReissueJWTAgeSecs
+	issuedAt, _ := token.IssuedAt()
+	return uint64(time.Since(issuedAt).Seconds()) > a.config.ReissueJWTAgeSecs
 }
 
 func (a *authenticator) addClaimsToContext(ctx context.Context, token jwt.Token, ipAddress string) context.Context {
-	// Extract common claims from JWT
-	claims := token.PrivateClaims()
 
 	// Create trusted headers map
 	trustedHeaders := make(dauth.TrustedHeaders)
 
 	// Add standard headers
-	if userID, ok := getClaimAsString(claims, "user_id"); ok {
+	var userID string
+	if err := token.Get("uid", &userID); err == nil {
 		trustedHeaders[dauth.SFHeaderUserID] = userID
-	} else if subject := token.Subject(); subject != "" {
+	} else if subject, ok := token.Subject(); ok {
 		// Legacy support: extract user ID from subject if it starts with "uid:"
 		if strings.HasPrefix(subject, "uid:") {
 			trustedHeaders[dauth.SFHeaderUserID] = strings.TrimPrefix(subject, "uid:")
 		}
 	}
 
-	if apiKeyID, ok := getClaimAsString(claims, "api_key_id"); ok {
+	var apiKeyID string
+	if err := token.Get("aki", &apiKeyID); err == nil {
 		trustedHeaders[dauth.SFHeaderApiKeyID] = apiKeyID
 	}
 
@@ -266,7 +280,8 @@ func (a *authenticator) addClaimsToContext(ctx context.Context, token jwt.Token,
 	trustedHeaders[dauth.SFHeaderIP] = ipAddress
 
 	// Add feature configs from JWT claims
-	if featureConfigs, ok := claims["feature_configs"].(map[string]interface{}); ok {
+	var featureConfigs map[string]any
+	if err := token.Get("cfg", &featureConfigs); err == nil {
 		for key, value := range featureConfigs {
 			headerKey := jwtFeatureConfigKeyToHeader(key)
 			if strValue, ok := value.(string); ok {
@@ -275,17 +290,14 @@ func (a *authenticator) addClaimsToContext(ctx context.Context, token jwt.Token,
 		}
 	}
 
+	// Plan tier is not in feature_configs, but given as claim anyway
+	var planTier string
+	if err := token.Get("plan_tier", &planTier); err == nil {
+		trustedHeaders[dauth.SFHeaderPlanTier] = planTier
+	}
+
 	// Add trusted headers to context
 	return dauth.WithTrustedHeaders(ctx, trustedHeaders)
-}
-
-func getClaimAsString(claims map[string]interface{}, key string) (string, bool) {
-	if val, exists := claims[key]; exists {
-		if strVal, ok := val.(string); ok {
-			return strVal, true
-		}
-	}
-	return "", false
 }
 
 func jwtFeatureConfigKeyToHeader(featureConfigKey string) string {
