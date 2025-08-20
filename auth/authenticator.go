@@ -173,6 +173,9 @@ func (a *authenticator) issueJWTFromAPIKey(ctx context.Context, apiKey string) (
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if a.config.Key != "" {
+		req.Header.Set("X-Api-Key", a.config.Key)
+	}
 
 	// Send the request
 	resp, err := a.httpClient.Do(req)
@@ -220,7 +223,7 @@ func (a *authenticator) reissueJWT(ctx context.Context, tokenString string) (jwt
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if a.config.Key != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.config.Key))
+		req.Header.Set("X-Api-Key", a.config.Key)
 	}
 
 	// Send the request
