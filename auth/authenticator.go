@@ -83,8 +83,10 @@ func (a *authenticator) Authenticate(ctx context.Context, path string, headers m
 			return ctx, fmt.Errorf("invalid JWT token: %w", err)
 		}
 
-		// Check if token needs reissue
-		if a.needsReissue(token) {
+		needsReissue := a.needsReissue(token)
+		a.logger.Debug("authorization from token", zap.Bool("needsReissue", needsReissue))
+
+		if needsReissue {
 			// Extract the actual JWT string from the authorization header
 			tokenString := authHeaders[0]
 			if strings.HasPrefix(strings.ToLower(tokenString), "bearer ") {
@@ -105,6 +107,7 @@ func (a *authenticator) Authenticate(ctx context.Context, path string, headers m
 			a.logger.Debug("failed to issue JWT from API key", zap.Error(err))
 			return ctx, fmt.Errorf("failed to authenticate with API key: %w", err)
 		}
+		a.logger.Debug("authorization from api key")
 	} else {
 		return ctx, fmt.Errorf("required authorization token not found. Please provide a valid JWT token via 'authorization' header or an API key via 'x-api-key' header")
 	}
@@ -295,6 +298,8 @@ func (a *authenticator) addClaimsToContext(ctx context.Context, token jwt.Token,
 	if err := token.Get("plan_tier", &planTier); err == nil {
 		trustedHeaders[dauth.SFHeaderPlanTier] = planTier
 	}
+
+	a.logger.Debug("added claims", zap.Any("headers", trustedHeaders))
 
 	// Add trusted headers to context
 	return dauth.WithTrustedHeaders(ctx, trustedHeaders)
