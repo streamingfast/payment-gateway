@@ -1,14 +1,14 @@
 # Payment Gateway Authenticator
 
-This package provides a JWT-based authentication system that integrates with the StreamingFast dauth framework. It has been migrated from an external library to be self-contained within the payment gateway.
+This package provides a Key-based and JWT-based authentication system to The Graph Market and services
 
 ## Features
 
 - **JWT Token Validation**: Validates JWT tokens using JWK sets fetched from a URL or provided as base64-encoded keys
 - **API Key Exchange**: Automatically exchanges API keys for JWT tokens via an issue endpoint
-- **Token Reissue**: Automatically reissues JWT tokens that are older than a configured threshold
+- **Token Reissue**: Automatically reissues JWT tokens that are older than a configured threshold (too old to trust)
 - **Feature Configurations**: Extracts and propagates feature configurations from JWT claims
-- **Legacy Support**: Supports legacy JWT formats with user IDs in the subject field
+- (No cutoff mechanism): Cutoff mechanism will be implemented in the upcoming 'Session' management plugin
 
 ## Configuration
 
@@ -18,9 +18,11 @@ The authenticator is configured using a URL-style connection string with the fol
 paymentgateway://[host[:port]]?[parameters]
 ```
 
+Default host: `auth.thegraph.market`
+
 ### Parameters
 
-- `pubkeyurl`: URL to fetch the JWK set for JWT verification (e.g., `https://auth.example.com/.well-known/jwks.json`)
+- `pubkeyurl`: URL to fetch the JWK set for JWT verification (default: `https://auth.thegraph.market/.well-known/jwks.json`)
 - `pubkeybase64`: Base64-encoded JWK set for offline JWT verification (mutually exclusive with `pubkeyurl`)
 - `reissue-jwt-max-age-secs`: Maximum age in seconds before a JWT token is reissued (default: 600)
 - `key`: Authentication key for the reissue endpoint to prevent rate limiting
@@ -31,17 +33,12 @@ paymentgateway://[host[:port]]?[parameters]
 
 **Production:**
 ```
-paymentgateway://auth.thegraph.market?pubkeyurl=https://auth.thegraph.market/.well-known/jwks.json&reissue-jwt-max-age-secs=600&key=server_key
+paymentgateway://?key=server_key
 ```
 
 **Development:**
 ```
-paymentgateway://localhost:8080?plaintext=true&insecure=true&pubkeyurl=http://localhost:8080/.well-known/jwks.json
-```
-
-**Offline Verification:**
-```
-paymentgateway://auth.example.com?pubkeybase64=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
+paymentgateway://localhost:8080?plaintext=true&pubkeyurl=http://localhost:8080/.well-known/jwks.json
 ```
 
 ## Usage
@@ -77,38 +74,33 @@ if err != nil {
 
 ### Authentication
 
-The authenticator supports two authentication methods:
-
-#### 1. JWT Token Authentication
-
-Pass a JWT token via the `Authorization` header:
+* The authenticator expects headers with either one of the following keys:
+    * `Authorization`: JWT token
+    * `X-API-Key`: API key
 
 ```go
-headers := map[string][]string{
-    "Authorization": {"Bearer eyJhbGciOiJIUzI1NiIs..."},
-}
-
-ctx, err := authenticator.Authenticate(context.Background(), "/api/endpoint", headers, "192.168.1.1")
+ctx, err := authenticator.Authenticate(ctx, "/api/endpoint", headers, "192.168.1.1")
 if err != nil {
     // Handle authentication failure
 }
-
-// Extract trusted headers from context
-trustedHeaders := dauth.FromContext(ctx)
-userID := trustedHeaders[dauth.SFHeaderUserID]
-apiKeyID := trustedHeaders[dauth.SFHeaderApiKeyID]
 ```
 
-#### 2. API Key Authentication
+### Authorizations (JWT claims)
 
-Pass an API key via the `X-API-Key` header. The authenticator will automatically exchange it for a JWT token:
+The authentication plugin puts "Trusted Headers" in the context
+
 
 ```go
-headers := map[string][]string{
-    "X-API-Key": {"server_1234567890abcdef"},
-}
+trustedHeaders := dauth.FromContext(ctx)
 
-ctx, err := authenticator.Authenticate(context.Background(), "/api/endpoint", headers, "192.168.1.1")
+// some helpers around common headers
+userID :=	trustedHeaders.UserID()
+apiKeyID := trustedHeaders.APIKeyID()
+
+// some application-specific headers
+if substreamsParallelJobs := trustedHeaders.Get("x-sf-substreams-parallel-jobs"); substreamsParallelJobs != "" {
+	// set the number of parallel jobs ...
+}
 ```
 
 ## Authentication Flow
@@ -140,6 +132,7 @@ The authenticator communicates with two external endpoints:
 - **Content-Type**: `application/json`
 - **Request Body**: `{"api_key": "the_api_key"}`
 - **Response**: `{"token": "jwt_token_string"}`
+- **Optional Header**: `X-Api-Key: [key]` (if configured)
 
 Used to exchange an API key for a JWT token.
 
@@ -150,6 +143,6 @@ Used to exchange an API key for a JWT token.
 - **Content-Type**: `application/json`
 - **Request Body**: `{"jwt": "existing_jwt_token"}`
 - **Response**: `{"token": "new_jwt_token_string"}`
-- **Optional Header**: `Authorization: Bearer [key]` (if configured)
+- **Optional Header**: `X-Api-Key: [key]` (if configured)
 
-Used to obtain a new JWT token from an existing one that's approaching expiration.
+Used to obtain a new JWT token from an existing one that is "too old to trust"
