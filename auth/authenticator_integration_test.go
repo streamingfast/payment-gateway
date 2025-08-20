@@ -37,10 +37,10 @@ func TestEndToEndAuthentication(t *testing.T) {
 	token := jwt.New()
 	token.Set(jwt.IssuedAtKey, time.Now())
 	token.Set(jwt.ExpirationKey, time.Now().Add(time.Hour))
-	token.Set("user_id", "test-user-123")
-	token.Set("api_key_id", "api-key-456")
+	token.Set("uid", "test-user-123")
+	token.Set("aki", "api-key-456")
 	token.Set("plan_tier", "premium")
-	token.Set("feature_configs", map[string]interface{}{
+	token.Set("cfg", map[string]interface{}{
 		"max_requests":   "1000",
 		"enable_feature": "true",
 	})
@@ -74,13 +74,13 @@ func TestEndToEndAuthentication(t *testing.T) {
 			}
 
 		case "/v1/auth/reissue":
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "Bearer reissue-key" {
+			keyHeader := r.Header.Get("X-Api-Key")
+			if keyHeader == "reissue-key" {
 				// Create new token with updated issued time
 				newToken := jwt.New()
 				newToken.Set(jwt.IssuedAtKey, time.Now())
 				newToken.Set(jwt.ExpirationKey, time.Now().Add(time.Hour))
-				newToken.Set("user_id", "reissued-user")
+				newToken.Set("uid", "reissued-user")
 
 				newSigned, _ := jwt.Sign(newToken, jwt.WithKey(jwa.ES256(), signKey))
 				response := map[string]string{
@@ -102,7 +102,7 @@ func TestEndToEndAuthentication(t *testing.T) {
 	Register()
 	logger := zap.NewNop()
 
-	config := "paymentgateway://" + authServer.Listener.Addr().String() +
+	config := "tgm://" + authServer.Listener.Addr().String() +
 		"?pubkeyurl=" + jwkServer.URL +
 		"&plaintext=true" +
 		"&key=reissue-key" +

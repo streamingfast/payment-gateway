@@ -37,15 +37,17 @@ import (
 // made without TLS, you cannot use that on production endpoints since they require a <token> and that a <token> can be sent
 // onlt if the connection is secured with TLS.
 func Register() {
-	dmetering.Register("paymentgateway", func(config string, logger *zap.Logger) (dmetering.EventEmitter, error) {
-		configExpanded := os.ExpandEnv(config)
+	for _, alias := range []string{"paymentGateway", "tgm"} {
+		dmetering.Register(alias, func(config string, logger *zap.Logger) (dmetering.EventEmitter, error) {
+			configExpanded := os.ExpandEnv(config)
 
-		c, err := newConfig(configExpanded)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse config string %s: %w", config, err)
-		}
-		return newEmitter(c, logger)
-	})
+			c, err := newConfig(configExpanded)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse config string %s: %w", config, err)
+			}
+			return newEmitter(c, logger)
+		})
+	}
 }
 
 type CloseFunc func() error

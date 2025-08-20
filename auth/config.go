@@ -34,7 +34,7 @@ func newConfig(configURL string) (*Config, error) {
 	}
 
 	protocol := u.Scheme
-	if protocol != "paymentgateway" {
+	if protocol != "paymentgateway" && protocol != "tgm" {
 		return nil, fmt.Errorf("invalid protocol: %s", protocol)
 	}
 
@@ -72,6 +72,7 @@ func newConfig(configURL string) (*Config, error) {
 	}
 	if keyBase64 != "" {
 		c.PubKeyBase64 = keyBase64
+		c.PubKeyURL = "" // remove default value here
 	}
 
 	// Parse reissue-jwt-max-age-secs if provided

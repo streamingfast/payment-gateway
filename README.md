@@ -1,14 +1,17 @@
-## StreamingFast Payment Gateway
+#  The Graph Market plugins for authentication and metering
 
-This repository contains public interfaces, clients and other utilities for the StreamingFast Payment Gateway, which is the all encompassing Gateway for consuming Substreams and Firehose services as well as tooling for indexer to report their usage.
+This repository contains public interfaces, clients and other utilities for The Graph market authentication and metering, used for consuming Substreams, Firehose and tokenAPI services as well as tooling for indexer to report their usage.
 
-### Service Developers
+It is intended for developers that would like to offer their services on this platform.
 
-This section serves as the documentation for developers that would like to offer their services on StreamingFast Payment Gateway. If you are **only** a consumer of services, this section is not for you.
+### Authentication plugin
 
-### Usage Reporting
+* Doc: [./auth/README.md](./auth/README.md)
+* Example: [./examples/payment-gateway-authentication](./examples/payment-gateway-authentication/main.go)
 
-This library enables the `paymentGateway://...` metering plugin that can be hooked into your application for reporting usages.
+### Metering plugin
+
+This library enables the `tgm://...` (formerly `paymentGateway://...`) metering plugin that can be hooked into your application for reporting usages.
 
 To register the scheme and obtain a metering event emitter, you can use the following snippet:
 
@@ -22,7 +25,7 @@ func init() {
 }
 
 func main() {
-	pluginDSN := "paymentGateway://abp.thegraph.market?network=eth-mainnet&token=${API_TOKEN}"
+	pluginDSN := "tgm://abp.thegraph.market?network=eth-mainnet&token=${API_TOKEN}"
 
 	eventEmitter, err := dmetering.New(pluginDSN, zap.NewNop())
 	if err != nil {
@@ -33,7 +36,7 @@ func main() {
 }
 ```
 
-#### gRPC
+### gRPC
 
 > [!NOTE]
 > Full example with import(s) and code annotations at [./examples/payment-gateway-usage-grpc](./examples/payment-gateway-usage-grpc/main.go).

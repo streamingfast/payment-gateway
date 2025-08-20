@@ -15,7 +15,7 @@ func TestConfig_new(t *testing.T) {
 		expectError bool
 	}{
 		{
-			dsn: "paymentGateway://localhost?buffer=25&network=eth-mainnet",
+			dsn: "tgm://localhost?buffer=25&network=eth-mainnet",
 			expect: &Config{
 				Endpoint:   "localhost:443",
 				Network:    "eth-mainnet",

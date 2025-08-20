@@ -20,15 +20,17 @@ import (
 
 // Register registers the payment gateway authenticator with dauth
 func Register() {
-	dauth.Register("paymentgateway", func(config string, logger *zap.Logger) (dauth.Authenticator, error) {
-		configExpanded := os.ExpandEnv(config)
+	for _, alias := range []string{"paymentgateway", "tgm"} {
+		dauth.Register(alias, func(config string, logger *zap.Logger) (dauth.Authenticator, error) {
+			configExpanded := os.ExpandEnv(config)
 
-		c, err := newConfig(configExpanded)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse config string %s: %w", config, err)
-		}
-		return new(c, logger)
-	})
+			c, err := newConfig(configExpanded)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse config string %s: %w", config, err)
+			}
+			return new(c, logger)
+		})
+	}
 }
 
 func new(config *Config, logger *zap.Logger) (dauth.Authenticator, error) {

@@ -24,8 +24,8 @@ func main() {
 		return
 	}
 
-	pluginDSN := "paymentgateway://"
-	// pluginDSN := "paymentgateway://auth.thegraph.market?pubkeyurl=https://auth.thegraph.market/.well-known/jwks.json" // default values
+	pluginDSN := "tgm://"
+	// pluginDSN := "tgm://auth.thegraph.market?pubkeyurl=https://auth.thegraph.market/.well-known/jwks.json" // default values
 
 	authenticator, err := dauth.New(pluginDSN, zap.NewNop())
 	if err != nil {

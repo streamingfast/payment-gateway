@@ -167,10 +167,10 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 
 	// Create test JWT with various claims
 	validJWT, err := createTestJWT(privateKey, map[string]interface{}{
-		"user_id":    "test-user-123",
-		"api_key_id": "api-key-456",
-		"plan_tier":  "premium",
-		"feature_configs": map[string]interface{}{
+		"uid":       "test-user-123",
+		"aki":       "api-key-456",
+		"plan_tier": "premium",
+		"cfg": map[string]interface{}{
 			"max_requests": "1000",
 			"enable_beta":  "true",
 		},
@@ -181,7 +181,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 	oldToken := jwt.New()
 	oldToken.Set(jwt.IssuedAtKey, time.Now().Add(-time.Hour))
 	oldToken.Set(jwt.ExpirationKey, time.Now().Add(time.Hour))
-	oldToken.Set("user_id", "old-user")
+	oldToken.Set("uid", "old-user")
 
 	key, _ := jwk.Import(privateKey)
 	signedOld, _ := jwt.Sign(oldToken, jwt.WithKey(jwa.ES256(), key))
@@ -385,14 +385,14 @@ func TestAuthenticator_ParseJWT(t *testing.T) {
 	require.NoError(t, err)
 
 	validJWT, err := createTestJWT(privateKey, map[string]interface{}{
-		"user_id": "test-user",
+		"uid": "test-user",
 	})
 	require.NoError(t, err)
 
 	// Create JWT with different key
 	differentKey, _, _ := generateTestKeyPair()
 	invalidJWT, _ := createTestJWT(differentKey, map[string]interface{}{
-		"user_id": "test-user",
+		"uid": "test-user",
 	})
 
 	auth := &authenticator{
@@ -481,6 +481,7 @@ func TestAuthenticator_needsReissue(t *testing.T) {
 func TestAuthenticator_addClaimsToContext(t *testing.T) {
 	auth := &authenticator{
 		config: &Config{},
+		logger: zap.NewNop(),
 	}
 
 	tests := []struct {
@@ -492,9 +493,9 @@ func TestAuthenticator_addClaimsToContext(t *testing.T) {
 		{
 			name: "standard claims",
 			claims: map[string]interface{}{
-				"user_id":    "user123",
-				"api_key_id": "key456",
-				"plan_tier":  "premium",
+				"uid":       "user123",
+				"aki":       "key456",
+				"plan_tier": "premium",
 			},
 			ipAddress: "10.0.0.1",
 			expected: map[string]string{
@@ -518,7 +519,7 @@ func TestAuthenticator_addClaimsToContext(t *testing.T) {
 		{
 			name: "feature configs",
 			claims: map[string]interface{}{
-				"feature_configs": map[string]interface{}{
+				"cfg": map[string]interface{}{
 					"max_requests":     "1000",
 					"enable_feature_x": "true",
 					"rate_limit":       "500",
@@ -603,7 +604,7 @@ func TestAuthenticator_issueJWTFromAPIKey(t *testing.T) {
 	require.NoError(t, err)
 
 	validJWT, err := createTestJWT(privateKey, map[string]interface{}{
-		"user_id": "api-user",
+		"uid": "api-user",
 	})
 	require.NoError(t, err)
 
@@ -700,12 +701,12 @@ func TestAuthenticator_reissueJWT(t *testing.T) {
 	require.NoError(t, err)
 
 	oldJWT, err := createTestJWT(privateKey, map[string]interface{}{
-		"user_id": "old-user",
+		"uid": "old-user",
 	})
 	require.NoError(t, err)
 
 	newJWT, err := createTestJWT(privateKey, map[string]interface{}{
-		"user_id": "refreshed-user",
+		"uid": "refreshed-user",
 	})
 	require.NoError(t, err)
 
@@ -725,7 +726,7 @@ func TestAuthenticator_reissueJWT(t *testing.T) {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					assert.Equal(t, "POST", r.Method)
 					assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-					assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
+					assert.Equal(t, "test-key", r.Header.Get("X-Api-Key"))
 
 					var body map[string]string
 					json.NewDecoder(r.Body).Decode(&body)
@@ -823,7 +824,7 @@ func TestAuthenticator_extractAndParseJWT(t *testing.T) {
 	require.NoError(t, err)
 
 	validJWT, err := createTestJWT(privateKey, map[string]interface{}{
-		"user_id": "test-user",
+		"uid": "test-user",
 	})
 	require.NoError(t, err)
 

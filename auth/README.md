@@ -15,7 +15,7 @@ This package provides a Key-based and JWT-based authentication system to The Gra
 The authenticator is configured using a URL-style connection string with the following format:
 
 ```
-paymentgateway://[host[:port]]?[parameters]
+tgm://[host[:port]]?[parameters]
 ```
 
 Default host: `auth.thegraph.market`
@@ -33,12 +33,12 @@ Default host: `auth.thegraph.market`
 
 **Production:**
 ```
-paymentgateway://?key=server_key
+tgm://?key=server_key
 ```
 
 **Development:**
 ```
-paymentgateway://localhost:8080?plaintext=true&pubkeyurl=http://localhost:8080/.well-known/jwks.json
+tgm://localhost:8080?plaintext=true&pubkeyurl=http://localhost:8080/.well-known/jwks.json
 ```
 
 ## Usage
@@ -63,7 +63,7 @@ import (
     "go.uber.org/zap"
 )
 
-config := "paymentgateway://"
+config := "tgm://"
 logger := zap.NewLogger()
 
 authenticator, err := dauth.New(config, logger)
