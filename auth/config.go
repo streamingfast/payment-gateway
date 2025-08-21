@@ -11,7 +11,7 @@ type Config struct {
 	Insecure  bool   // skip certificate verification on endpoint
 	Plaintext bool   // skip encryption on endpoint
 
-	Key               string // key to authenticate when asking for 'reissue', used to prevent being rate-limited
+	IndexerAPIKey     string // Authentication key used to prevent rate limiting when calling /issue or /reissue endpoints on behalf of the user
 	ReissueJWTAgeSecs uint64 // max age of JWT in seconds to trust its 'claims', after which we will ask for a reissue
 	PubKeyURL         string // URL to fetch public keys for JWT verification
 	PubKeyBase64      string // Base64-encoded public key for JWT verification
@@ -21,8 +21,8 @@ type Config struct {
 
 func newConfig(configURL string) (*Config, error) {
 	c := &Config{
-		Endpoint:          "auth.thegraph.market",
-		PubKeyURL:         "https://auth.thegraph.market/.well-known/jwks.json",
+		Endpoint:          "",
+		PubKeyURL:         "",
 		ReissueJWTAgeSecs: 600,
 		Insecure:          false,
 		Plaintext:         false,
@@ -41,13 +41,14 @@ func newConfig(configURL string) (*Config, error) {
 	hostname := u.Hostname()
 	port := u.Port()
 
-	if hostname != "" {
-		// Only include port if it's non-standard
-		if port != "" && port != "443" && port != "80" {
-			c.Endpoint = fmt.Sprintf("%s:%s", hostname, port)
-		} else {
-			c.Endpoint = hostname
-		}
+	if hostname == "" {
+		return nil, fmt.Errorf("you must provide a hostname, ex: auth.thegraph.market")
+	}
+	// Only include port if it's non-standard
+	if port != "" && port != "443" && port != "80" {
+		c.Endpoint = fmt.Sprintf("%s:%s", hostname, port)
+	} else {
+		c.Endpoint = hostname
 	}
 
 	vals := u.Query()
@@ -59,20 +60,27 @@ func newConfig(configURL string) (*Config, error) {
 		c.Plaintext = true
 	}
 
-	c.Key = vals.Get("key")
+	c.IndexerAPIKey = vals.Get("indexer-api-key")
 
-	keyURL := vals.Get("pubkeyurl")
-	keyBase64 := vals.Get("pubkeybase64")
+	keyURL := vals.Get("pub-key-url")
+	keyBase64 := vals.Get("pub-key-base64")
 
-	if keyURL != "" {
+	scheme := "https"
+	if c.Plaintext {
+		scheme = "http"
+	}
+
+	switch {
+	case keyURL != "":
 		c.PubKeyURL = keyURL
 		if keyBase64 != "" {
-			return nil, fmt.Errorf("only one of pubkeyurl or pubkeybase64 can be provided, not both")
+			return nil, fmt.Errorf("only one of pub-key-url or pub-key-base64 can be provided, not both")
 		}
-	}
-	if keyBase64 != "" {
+	case keyBase64 != "":
 		c.PubKeyBase64 = keyBase64
 		c.PubKeyURL = "" // remove default value here
+	default:
+		c.PubKeyURL = fmt.Sprintf("%s://%s/.well-known/jwks.json", scheme, c.Endpoint)
 	}
 
 	// Parse reissue-jwt-max-age-secs if provided
@@ -83,13 +91,8 @@ func newConfig(configURL string) (*Config, error) {
 		}
 	}
 
-	if c.Plaintext {
-		c.ReissueURL = fmt.Sprintf("http://%s/v1/auth/reissue", c.Endpoint)
-		c.IssueURL = fmt.Sprintf("http://%s/v1/auth/issue", c.Endpoint)
-	} else {
-		c.ReissueURL = fmt.Sprintf("https://%s/v1/auth/reissue", c.Endpoint)
-		c.IssueURL = fmt.Sprintf("https://%s/v1/auth/issue", c.Endpoint)
-	}
+	c.ReissueURL = fmt.Sprintf("%s://%s/v1/auth/reissue", scheme, c.Endpoint)
+	c.IssueURL = fmt.Sprintf("%s://%s/v1/auth/issue", scheme, c.Endpoint)
 
 	return c, nil
 }

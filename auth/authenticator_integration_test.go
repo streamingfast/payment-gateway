@@ -103,9 +103,9 @@ func TestEndToEndAuthentication(t *testing.T) {
 	logger := zap.NewNop()
 
 	config := "tgm://" + authServer.Listener.Addr().String() +
-		"?pubkeyurl=" + jwkServer.URL +
+		"?pub-key-url=" + jwkServer.URL +
 		"&plaintext=true" +
-		"&key=reissue-key" +
+		"&indexer-api-key=reissue-key" +
 		"&reissue-jwt-max-age-secs=300"
 
 	auth, err := dauth.New(config, logger)
@@ -124,12 +124,12 @@ func TestEndToEndAuthentication(t *testing.T) {
 		assert.NoError(t, err)
 
 		trustedHeaders := dauth.FromContext(newCtx)
-		assert.Equal(t, "test-user-123", trustedHeaders[dauth.SFHeaderUserID])
-		assert.Equal(t, "api-key-456", trustedHeaders[dauth.SFHeaderApiKeyID])
-		assert.Equal(t, "premium", trustedHeaders[dauth.SFHeaderPlanTier])
-		assert.Equal(t, "192.168.1.1", trustedHeaders[dauth.SFHeaderIP])
-		assert.Equal(t, "1000", trustedHeaders["x-sf-max-requests"])
-		assert.Equal(t, "true", trustedHeaders["x-sf-enable-feature"])
+		assert.Equal(t, "test-user-123", trustedHeaders[dauth.HeaderUserID])
+		assert.Equal(t, "api-key-456", trustedHeaders[dauth.HeaderApiKeyID])
+		assert.Equal(t, "premium", trustedHeaders[dauth.HeaderPlanTier])
+		assert.Equal(t, "192.168.1.1", trustedHeaders[dauth.HeaderIP])
+		assert.Equal(t, "1000", trustedHeaders["x-max-requests"])
+		assert.Equal(t, "true", trustedHeaders["x-enable-feature"])
 	})
 
 	// Test 2: Authenticate with API key
@@ -142,8 +142,8 @@ func TestEndToEndAuthentication(t *testing.T) {
 		assert.NoError(t, err)
 
 		trustedHeaders := dauth.FromContext(newCtx)
-		assert.Equal(t, "test-user-123", trustedHeaders[dauth.SFHeaderUserID])
-		assert.Equal(t, "10.0.0.1", trustedHeaders[dauth.SFHeaderIP])
+		assert.Equal(t, "test-user-123", trustedHeaders[dauth.HeaderUserID])
+		assert.Equal(t, "10.0.0.1", trustedHeaders[dauth.HeaderIP])
 	})
 
 	// Test 3: Invalid API key
@@ -177,7 +177,7 @@ func TestEndToEndAuthentication(t *testing.T) {
 
 		trustedHeaders := dauth.FromContext(newCtx)
 		// Should have the reissued user ID
-		assert.Equal(t, "reissued-user", trustedHeaders[dauth.SFHeaderUserID])
+		assert.Equal(t, "reissued-user", trustedHeaders[dauth.HeaderUserID])
 	})
 
 	// Test 5: Missing authentication
@@ -210,7 +210,7 @@ func TestEndToEndAuthentication(t *testing.T) {
 		assert.NoError(t, err)
 
 		trustedHeaders := dauth.FromContext(newCtx)
-		assert.Equal(t, "test-user-123", trustedHeaders[dauth.SFHeaderUserID])
+		assert.Equal(t, "test-user-123", trustedHeaders[dauth.HeaderUserID])
 	})
 
 	// Test 8: Expired JWT

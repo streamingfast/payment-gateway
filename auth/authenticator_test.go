@@ -203,11 +203,11 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 			wantError: false,
 			checkContext: func(t *testing.T, ctx context.Context) {
 				headers := dauth.FromContext(ctx)
-				assert.Equal(t, "test-user-123", headers[dauth.SFHeaderUserID])
-				assert.Equal(t, "api-key-456", headers[dauth.SFHeaderApiKeyID])
-				assert.Equal(t, "premium", headers[dauth.SFHeaderPlanTier])
-				assert.Equal(t, "1000", headers["x-sf-max-requests"])
-				assert.Equal(t, "true", headers["x-sf-enable-beta"])
+				assert.Equal(t, "test-user-123", headers[dauth.HeaderUserID])
+				assert.Equal(t, "api-key-456", headers[dauth.HeaderApiKeyID])
+				assert.Equal(t, "premium", headers[dauth.HeaderPlanTier])
+				assert.Equal(t, "1000", headers["x-max-requests"])
+				assert.Equal(t, "true", headers["x-enable-beta"])
 			},
 		},
 		{
@@ -218,7 +218,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 			wantError: false,
 			checkContext: func(t *testing.T, ctx context.Context) {
 				headers := dauth.FromContext(ctx)
-				assert.Equal(t, "test-user-123", headers[dauth.SFHeaderUserID])
+				assert.Equal(t, "test-user-123", headers[dauth.HeaderUserID])
 			},
 		},
 		{
@@ -254,7 +254,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 			wantError: false,
 			checkContext: func(t *testing.T, ctx context.Context) {
 				headers := dauth.FromContext(ctx)
-				assert.Equal(t, "test-user-123", headers[dauth.SFHeaderUserID])
+				assert.Equal(t, "test-user-123", headers[dauth.HeaderUserID])
 			},
 		},
 		{
@@ -297,7 +297,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 			checkContext: func(t *testing.T, ctx context.Context) {
 				headers := dauth.FromContext(ctx)
 				// Should have claims from the new reissued token
-				assert.Equal(t, "test-user-123", headers[dauth.SFHeaderUserID])
+				assert.Equal(t, "test-user-123", headers[dauth.HeaderUserID])
 			},
 		},
 		{
@@ -308,7 +308,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 			wantError: false,
 			checkContext: func(t *testing.T, ctx context.Context) {
 				headers := dauth.FromContext(ctx)
-				assert.Equal(t, "test-user-123", headers[dauth.SFHeaderUserID])
+				assert.Equal(t, "test-user-123", headers[dauth.HeaderUserID])
 			},
 		},
 		{
@@ -370,7 +370,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 
 				// Check IP address is always added
 				headers := dauth.FromContext(newCtx)
-				assert.Equal(t, "192.168.1.1", headers[dauth.SFHeaderIP])
+				assert.Equal(t, "192.168.1.1", headers[dauth.HeaderIP])
 			}
 		})
 	}
@@ -499,10 +499,10 @@ func TestAuthenticator_addClaimsToContext(t *testing.T) {
 			},
 			ipAddress: "10.0.0.1",
 			expected: map[string]string{
-				dauth.SFHeaderUserID:   "user123",
-				dauth.SFHeaderApiKeyID: "key456",
-				dauth.SFHeaderPlanTier: "premium",
-				dauth.SFHeaderIP:       "10.0.0.1",
+				dauth.HeaderUserID:   "user123",
+				dauth.HeaderApiKeyID: "key456",
+				dauth.HeaderPlanTier: "premium",
+				dauth.HeaderIP:       "10.0.0.1",
 			},
 		},
 		{
@@ -512,8 +512,8 @@ func TestAuthenticator_addClaimsToContext(t *testing.T) {
 			},
 			ipAddress: "10.0.0.2",
 			expected: map[string]string{
-				dauth.SFHeaderUserID: "legacy-user",
-				dauth.SFHeaderIP:     "10.0.0.2",
+				dauth.HeaderUserID: "legacy-user",
+				dauth.HeaderIP:     "10.0.0.2",
 			},
 		},
 		{
@@ -527,10 +527,10 @@ func TestAuthenticator_addClaimsToContext(t *testing.T) {
 			},
 			ipAddress: "10.0.0.3",
 			expected: map[string]string{
-				"x-sf-max-requests":     "1000",
-				"x-sf-enable-feature-x": "true",
-				"x-sf-rate-limit":       "500",
-				dauth.SFHeaderIP:        "10.0.0.3",
+				"x-max-requests":     "1000",
+				"x-enable-feature-x": "true",
+				"x-rate-limit":       "500",
+				dauth.HeaderIP:       "10.0.0.3",
 			},
 		},
 	}
@@ -561,19 +561,19 @@ func TestJwtFeatureConfigKeyToHeader(t *testing.T) {
 	}{
 		{
 			input:    "max_requests",
-			expected: "x-sf-max-requests",
+			expected: "x-max-requests",
 		},
 		{
 			input:    "ENABLE_FEATURE",
-			expected: "x-sf-enable-feature",
+			expected: "x-enable-feature",
 		},
 		{
 			input:    "rate_limit_per_second",
-			expected: "x-sf-rate-limit-per-second",
+			expected: "x-rate-limit-per-second",
 		},
 		{
 			input:    "simple",
-			expected: "x-sf-simple",
+			expected: "x-simple",
 		},
 	}
 
@@ -790,8 +790,8 @@ func TestAuthenticator_reissueJWT(t *testing.T) {
 
 			auth := &authenticator{
 				config: &Config{
-					ReissueURL: server.URL,
-					Key:        tt.configKey,
+					ReissueURL:    server.URL,
+					IndexerAPIKey: tt.configKey,
 				},
 				logger:     logger,
 				jwkSet:     jwkSet,

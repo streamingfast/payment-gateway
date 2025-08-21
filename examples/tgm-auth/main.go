@@ -25,7 +25,7 @@ func main() {
 	}
 
 	pluginDSN := "tgm://"
-	// pluginDSN := "tgm://auth.thegraph.market?pubkeyurl=https://auth.thegraph.market/.well-known/jwks.json" // default values
+	// pluginDSN := "tgm://auth.thegraph.market?pub-key-url=https://auth.thegraph.market/.well-known/jwks.json" // default values
 
 	authenticator, err := dauth.New(pluginDSN, zap.NewNop())
 	if err != nil {

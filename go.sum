@@ -151,8 +151,8 @@ github.com/sercand/kuberesolver/v5 v5.1.1 h1:CYH+d67G0sGBj7q5wLK61yzqJJ8gLLC8aep
 github.com/sercand/kuberesolver/v5 v5.1.1/go.mod h1:Fs1KbKhVRnB2aDWN12NjKCB+RgYMWZJ294T3BtmVCpQ=
 github.com/sethvargo/go-retry v0.2.3 h1:oYlgvIvsju3jNbottWABtbnoLC+GDtLdBHxKWxQm/iU=
 github.com/sethvargo/go-retry v0.2.3/go.mod h1:1afjQuvh7s4gflMObvjLPaWgluLLyhA1wmVZ6KLpICw=
-github.com/streamingfast/dauth v0.0.0-20250819154437-3c8187ed7970 h1:MrWakio3qGBwKPFcnWTSWMga9I8U8SsDhgq7g7UBYeE=
-github.com/streamingfast/dauth v0.0.0-20250819154437-3c8187ed7970/go.mod h1:d8NTrjIoiqplrZEYOUXwwFaeB2C8fVeHYLvaJFfa9Xo=
+github.com/streamingfast/dauth v0.0.0-20250821135455-5bb8d1a0c26c h1:VPI7t3vMjMvvy3DKMez1AjwK+mjne+IAbiws7asYDmQ=
+github.com/streamingfast/dauth v0.0.0-20250821135455-5bb8d1a0c26c/go.mod h1:d8NTrjIoiqplrZEYOUXwwFaeB2C8fVeHYLvaJFfa9Xo=
 github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1 h1:xJB7rXnOHLesosMjfwWsEL2i/40mFSkzenEb3M0qTyM=
 github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1/go.mod h1:QSm/AfaDsE0k1xBYi0lW580YJ/WDV/FKZI628tkZR0Y=
 github.com/streamingfast/dgrpc v0.0.0-20240423143010-f36784700c9a h1:JwAGZ7f5vkBmq2CbrqR+nY2H7YA/2tNqkR9MKkhy6K0=

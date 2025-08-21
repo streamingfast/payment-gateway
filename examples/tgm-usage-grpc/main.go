@@ -14,9 +14,9 @@ import (
 )
 
 func main() {
-	endpoint := osEnvOr("PAYMENT_GATEWAY_ENDPOINT", "abp.thegraph.market:443")
-	insecure := osEnvOr("PAYMENT_GATEWAY_INSECURE", "false")
-	plainText := osEnvOr("PAYMENT_GATEWAY_PLAINTEXT", "false")
+	endpoint := osEnvOr("TGM_ENDPOINT", "abp.thegraph.market:443")
+	insecure := osEnvOr("TGM_INSECURE", "false")
+	plainText := osEnvOr("TGM_PLAINTEXT", "false")
 	token := osEnv("API_TOKEN")
 
 	conn, err := dgrpc.NewClientConn(endpoint,

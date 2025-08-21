@@ -16,11 +16,11 @@ This library enables the `tgm://...` (formerly `paymentGateway://...`) metering 
 To register the scheme and obtain a metering event emitter, you can use the following snippet:
 
 > [!NOTE]
-> Full example with import(s) and code annotations at [./examples/payment-gateway-metering](./examples/payment-gateway-metering/main.go).
+> Full example with import(s) and code annotations at [./examples/tgm-metering](./examples/payment-gateway-metering/main.go).
 
 ```go
 func init() {
-	// Register paymentGateway:// as a valid metering plugin, refers to Register documentation for extra details
+	// Register tgm:// as a valid metering plugin, refers to Register documentation for extra details
 	metering.Register()
 }
 
@@ -39,7 +39,7 @@ func main() {
 ### gRPC
 
 > [!NOTE]
-> Full example with import(s) and code annotations at [./examples/payment-gateway-usage-grpc](./examples/payment-gateway-usage-grpc/main.go).
+> Full example with import(s) and code annotations at [./examples/tgm-usage-grpc](./examples/payment-gateway-usage-grpc/main.go).
 
 ```go
 func main() {

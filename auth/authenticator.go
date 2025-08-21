@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,17 +21,15 @@ import (
 
 // Register registers the payment gateway authenticator with dauth
 func Register() {
-	for _, alias := range []string{"paymentgateway", "tgm"} {
-		dauth.Register(alias, func(config string, logger *zap.Logger) (dauth.Authenticator, error) {
-			configExpanded := os.ExpandEnv(config)
+	dauth.Register("tgm", func(config string, logger *zap.Logger) (dauth.Authenticator, error) {
+		configExpanded := os.ExpandEnv(config)
 
-			c, err := newConfig(configExpanded)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse config string %s: %w", config, err)
-			}
-			return new(c, logger)
-		})
-	}
+		c, err := newConfig(configExpanded)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse config string %s: %w", config, err)
+		}
+		return new(c, logger)
+	})
 }
 
 func new(config *Config, logger *zap.Logger) (dauth.Authenticator, error) {
@@ -52,11 +51,20 @@ func new(config *Config, logger *zap.Logger) (dauth.Authenticator, error) {
 		return nil, fmt.Errorf("no JWK URL or public key URL provided")
 	}
 
+	httpClient := &http.Client{Timeout: 15 * time.Second}
+	if config.Insecure {
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
+	}
+
 	return &authenticator{
 		config:     config,
 		logger:     logger,
 		jwkSet:     jwkSet,
-		httpClient: &http.Client{Timeout: 15 * time.Second},
+		httpClient: httpClient,
 	}, nil
 }
 
@@ -175,8 +183,8 @@ func (a *authenticator) issueJWTFromAPIKey(ctx context.Context, apiKey string) (
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if a.config.Key != "" {
-		req.Header.Set("X-Api-Key", a.config.Key)
+	if a.config.IndexerAPIKey != "" {
+		req.Header.Set("X-Api-Key", a.config.IndexerAPIKey)
 	}
 
 	// Send the request
@@ -224,8 +232,8 @@ func (a *authenticator) reissueJWT(ctx context.Context, tokenString string) (jwt
 		return nil, fmt.Errorf("failed to create reissue request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if a.config.Key != "" {
-		req.Header.Set("X-Api-Key", a.config.Key)
+	if a.config.IndexerAPIKey != "" {
+		req.Header.Set("X-Api-Key", a.config.IndexerAPIKey)
 	}
 
 	// Send the request
@@ -271,21 +279,21 @@ func (a *authenticator) addClaimsToContext(ctx context.Context, token jwt.Token,
 	// Add standard headers
 	var userID string
 	if err := token.Get("uid", &userID); err == nil {
-		trustedHeaders[dauth.SFHeaderUserID] = userID
+		trustedHeaders[dauth.HeaderUserID] = userID
 	} else if subject, ok := token.Subject(); ok {
 		// Legacy support: extract user ID from subject if it starts with "uid:"
 		if strings.HasPrefix(subject, "uid:") {
-			trustedHeaders[dauth.SFHeaderUserID] = strings.TrimPrefix(subject, "uid:")
+			trustedHeaders[dauth.HeaderUserID] = strings.TrimPrefix(subject, "uid:")
 		}
 	}
 
 	var apiKeyID string
 	if err := token.Get("aki", &apiKeyID); err == nil {
-		trustedHeaders[dauth.SFHeaderApiKeyID] = apiKeyID
+		trustedHeaders[dauth.HeaderApiKeyID] = apiKeyID
 	}
 
 	// Add IP address
-	trustedHeaders[dauth.SFHeaderIP] = ipAddress
+	trustedHeaders[dauth.HeaderIP] = ipAddress
 
 	// Add feature configs from JWT claims
 	var featureConfigs map[string]any
@@ -301,7 +309,7 @@ func (a *authenticator) addClaimsToContext(ctx context.Context, token jwt.Token,
 	// Plan tier is not in feature_configs, but given as claim anyway
 	var planTier string
 	if err := token.Get("plan_tier", &planTier); err == nil {
-		trustedHeaders[dauth.SFHeaderPlanTier] = planTier
+		trustedHeaders[dauth.HeaderPlanTier] = planTier
 	}
 
 	a.logger.Debug("added claims", zap.Any("headers", trustedHeaders))
@@ -311,7 +319,7 @@ func (a *authenticator) addClaimsToContext(ctx context.Context, token jwt.Token,
 }
 
 func jwtFeatureConfigKeyToHeader(featureConfigKey string) string {
-	return "x-sf-" + strings.Replace(strings.ToLower(featureConfigKey), "_", "-", -1)
+	return "x-" + strings.Replace(strings.ToLower(featureConfigKey), "_", "-", -1)
 }
 
 func (a *authenticator) Ready(ctx context.Context) bool {

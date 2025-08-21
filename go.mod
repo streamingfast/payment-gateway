@@ -7,7 +7,7 @@ toolchain go1.24.2
 require (
 	connectrpc.com/connect v1.16.1
 	github.com/lestrrat-go/jwx/v3 v3.0.10
-	github.com/streamingfast/dauth v0.0.0-20250819154437-3c8187ed7970
+	github.com/streamingfast/dauth v0.0.0-20250821135455-5bb8d1a0c26c
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20240423143010-f36784700c9a
 	github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e

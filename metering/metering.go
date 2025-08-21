@@ -27,7 +27,7 @@ import (
 // Register registers the payment gateway emitter inside [dmetering] package by calling
 // [dmetering.Register] with the proper factory function. The emitter accepts a URL with the following format:
 //
-//	paymentGateway://<endpoint>?network=<network>&token=${SF_API_TOKEN}[&insecure=true|false][&plaintext=true|false][&delay=1s][&buffer_size=1000][&panic_on_drop=true|false]
+//	tgm://<endpoint>?network=<network>&token=${SF_API_TOKEN}[&insecure=true|false][&plaintext=true|false][&delay=1s][&buffer_size=1000][&panic_on_drop=true|false]
 //
 // The metering plugin will emit events to the payment gateway service pointed to by <endpoint> (required). The endpoint
 // can contains a `:<port>` suffix to specify which port to use. If the port is not provided, 443 is assumed.

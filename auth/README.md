@@ -22,10 +22,10 @@ Default host: `auth.thegraph.market`
 
 ### Parameters
 
-- `pubkeyurl`: URL to fetch the JWK set for JWT verification (default: `https://auth.thegraph.market/.well-known/jwks.json`)
-- `pubkeybase64`: Base64-encoded JWK set for offline JWT verification (mutually exclusive with `pubkeyurl`)
-- `reissue-jwt-max-age-secs`: Maximum age in seconds before a JWT token is reissued (default: 600)
-- `key`: Authentication key for the reissue endpoint to prevent rate limiting
+- `pub-key-url`: URL to fetch the JWK set for JWT verification (default: `https://auth.thegraph.market/.well-known/jwks.json`)
+- `pub-key-base64`: Base64-encoded JWK set for offline JWT verification (mutually exclusive with `pub-key-url`)
+- `reissue-jwt-max-age-secs`: Maximum age in seconds before a JWT token is deemed too old and needs to be reissued (default: 600)
+- `indexer-api-key`: Authentication key used to prevent rate limiting when calling /issue or /reissue endpoints on behalf of the user
 - `insecure`: Skip certificate verification (default: false)
 - `plaintext`: Use HTTP instead of HTTPS (default: false)
 
@@ -33,12 +33,12 @@ Default host: `auth.thegraph.market`
 
 **Production:**
 ```
-tgm://?key=server_key
+tgm://?indexer-api-key=server_key
 ```
 
 **Development:**
 ```
-tgm://localhost:8080?plaintext=true&pubkeyurl=http://localhost:8080/.well-known/jwks.json
+tgm://localhost:8080?plaintext=true&pub-key-url=http://localhost:8080/.well-known/jwks.json
 ```
 
 ## Usage
@@ -98,8 +98,8 @@ userID :=	trustedHeaders.UserID()
 apiKeyID := trustedHeaders.APIKeyID()
 
 // some application-specific headers
-if substreamsParallelJobs := trustedHeaders.Get("x-sf-substreams-parallel-jobs"); substreamsParallelJobs != "" {
-	// set the number of parallel jobs ...
+if substreamsParallelWokers := trustedHeaders.Get("x-substreams-parallel-workers"); substreamsParallelWorkers != "" {
+	// set the number of parallel workers ...
 }
 ```
 
@@ -115,11 +115,11 @@ if substreamsParallelJobs := trustedHeaders.Get("x-sf-substreams-parallel-jobs")
 
 The following headers are automatically extracted from JWT claims and added to the context:
 
-- `x-sf-user-id`: User identifier
-- `x-sf-api-key-id`: API key identifier
+- `x-user-id`: User identifier
+- `x-api-key-id`: API key identifier
 - `x-real-ip`: Client IP address
-- `x-sf-plan-tier`: one of "FREE", "SCALING", "PRO", "ENTERPRISE"
-- Feature configuration headers (e.g., `x-sf-substreams-parallel-jobs`)
+- `x-plan-tier`: one of "FREE", "SCALING", "PRO", "ENTERPRISE"
+- Feature configuration headers (e.g., `x-substreams-parallel-workers`)
 
 ## Issuance Endpoints
 
