@@ -52,6 +52,13 @@ func newConfig(configURL string) (*Config, error) {
 	}
 
 	vals := u.Query()
+	for k, _ := range vals {
+		if k == "insecure" || k == "plaintext" || k == "indexer-api-key" || k == "pub-key-url" || k == "pub-key-base64" || k == "reissue-jwt-max-age-secs" {
+			continue
+		}
+		return nil, fmt.Errorf("unknown query parameter: %s", k)
+	}
+
 	if vals.Get("insecure") == "true" {
 		c.Insecure = true
 	}
