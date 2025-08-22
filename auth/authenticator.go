@@ -60,12 +60,33 @@ func new(config *Config, logger *zap.Logger) (dauth.Authenticator, error) {
 		}
 	}
 
-	return &authenticator{
+	a := &authenticator{
 		config:     config,
 		logger:     logger,
 		jwkSet:     jwkSet,
 		httpClient: httpClient,
-	}, nil
+	}
+	if config.IndexerAPIKey == "" {
+		logger.Warn("You have not set an API key in your auth configuration (`&indexer-api-key=<your_api_key>`). Under heavy load, you may get blacklisted by the '/issue' or '/reissue' endpoints")
+	} else {
+		jwt, err := a.issueJWTFromAPIKey(context.TODO(), config.IndexerAPIKey)
+		if err != nil {
+			logger.Error("Failed to issue JWT from the provided API key in your auth configuration (`&indexer-api-key=<your_api_key>`). Under heavy load, you may get blacklisted by the '/issue' or '/reissue' endpoints", zap.Error(err))
+		}
+		var hasIndexerIdentifier bool
+
+		featureConfigs := make(map[string]any)
+		if err := jwt.Get("cfg", &featureConfigs); err == nil {
+			if _, ok := featureConfigs["INDEXER_IDENTIFIER"]; ok {
+				hasIndexerIdentifier = true
+			}
+		}
+
+		if !hasIndexerIdentifier {
+			logger.Error("The provided API key in your auth configuration (`&indexer-api-key=<your_api_key>`) does **NOT** have the required INDEXER_IDENTIFIER claim. Under heavy load, you may get blacklisted by the '/issue' or '/reissue' endpoints", zap.Error(err))
+		}
+	}
+	return a, nil
 }
 
 type authenticator struct {
