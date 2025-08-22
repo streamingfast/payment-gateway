@@ -39,7 +39,7 @@ func TestEndToEndAuthentication(t *testing.T) {
 	token.Set(jwt.ExpirationKey, time.Now().Add(time.Hour))
 	token.Set("uid", "test-user-123")
 	token.Set("aki", "api-key-456")
-	token.Set("plan_tier", "premium")
+	token.Set("substreams_plan_tier", "pro")
 	token.Set("cfg", map[string]interface{}{
 		"max_requests":   "1000",
 		"enable_feature": "true",
@@ -126,7 +126,7 @@ func TestEndToEndAuthentication(t *testing.T) {
 		trustedHeaders := dauth.FromContext(newCtx)
 		assert.Equal(t, "test-user-123", trustedHeaders[dauth.HeaderUserID])
 		assert.Equal(t, "api-key-456", trustedHeaders[dauth.HeaderApiKeyID])
-		assert.Equal(t, "premium", trustedHeaders[dauth.HeaderSubstreamsPlanTier])
+		assert.Equal(t, "pro", trustedHeaders[dauth.HeaderSubstreamsPlanTier])
 		assert.Equal(t, "192.168.1.1", trustedHeaders[dauth.HeaderIP])
 		assert.Equal(t, "1000", trustedHeaders["x-max-requests"])
 		assert.Equal(t, "true", trustedHeaders["x-enable-feature"])

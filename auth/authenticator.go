@@ -330,7 +330,7 @@ func (a *authenticator) addClaimsToContext(ctx context.Context, token jwt.Token,
 
 	// Plan tier is not in feature_configs, but given as claim anyway
 	var substreamsPlanTier string
-	if err := token.Get("plan_tier", &substreamsPlanTier); err == nil {
+	if err := token.Get("substreams_plan_tier", &substreamsPlanTier); err == nil {
 		trustedHeaders[dauth.HeaderSubstreamsPlanTier] = substreamsPlanTier
 	}
 

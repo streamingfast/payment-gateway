@@ -167,9 +167,9 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 
 	// Create test JWT with various claims
 	validJWT, err := createTestJWT(privateKey, map[string]interface{}{
-		"uid":       "test-user-123",
-		"aki":       "api-key-456",
-		"plan_tier": "premium",
+		"uid":                  "test-user-123",
+		"aki":                  "api-key-456",
+		"substreams_plan_tier": "pro",
 		"cfg": map[string]interface{}{
 			"max_requests": "1000",
 			"enable_beta":  "true",
@@ -205,7 +205,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 				headers := dauth.FromContext(ctx)
 				assert.Equal(t, "test-user-123", headers[dauth.HeaderUserID])
 				assert.Equal(t, "api-key-456", headers[dauth.HeaderApiKeyID])
-				assert.Equal(t, "premium", headers[dauth.HeaderSubstreamsPlanTier])
+				assert.Equal(t, "pro", headers[dauth.HeaderSubstreamsPlanTier])
 				assert.Equal(t, "1000", headers["x-max-requests"])
 				assert.Equal(t, "true", headers["x-enable-beta"])
 			},
@@ -493,15 +493,15 @@ func TestAuthenticator_addClaimsToContext(t *testing.T) {
 		{
 			name: "standard claims",
 			claims: map[string]interface{}{
-				"uid":       "user123",
-				"aki":       "key456",
-				"plan_tier": "premium",
+				"uid":                  "user123",
+				"aki":                  "key456",
+				"substreams_plan_tier": "pro",
 			},
 			ipAddress: "10.0.0.1",
 			expected: map[string]string{
 				dauth.HeaderUserID:             "user123",
 				dauth.HeaderApiKeyID:           "key456",
-				dauth.HeaderSubstreamsPlanTier: "premium",
+				dauth.HeaderSubstreamsPlanTier: "pro",
 				dauth.HeaderIP:                 "10.0.0.1",
 			},
 		},
