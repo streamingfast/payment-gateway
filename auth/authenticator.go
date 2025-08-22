@@ -72,18 +72,19 @@ func new(config *Config, logger *zap.Logger) (dauth.Authenticator, error) {
 		jwt, err := a.issueJWTFromAPIKey(context.TODO(), config.IndexerAPIKey)
 		if err != nil {
 			logger.Error("Failed to issue JWT from the provided API key in your auth configuration (`&indexer-api-key=<your_api_key>`). Under heavy load, you may get blacklisted by the '/issue' or '/reissue' endpoints", zap.Error(err))
-		}
-		var hasIndexerIdentifier bool
+		} else {
+			var hasIndexerIdentifier bool
 
-		featureConfigs := make(map[string]any)
-		if err := jwt.Get("cfg", &featureConfigs); err == nil {
-			if _, ok := featureConfigs["INDEXER_IDENTIFIER"]; ok {
-				hasIndexerIdentifier = true
+			featureConfigs := make(map[string]any)
+			if err := jwt.Get("cfg", &featureConfigs); err == nil {
+				if _, ok := featureConfigs["INDEXER_IDENTIFIER"]; ok {
+					hasIndexerIdentifier = true
+				}
 			}
-		}
 
-		if !hasIndexerIdentifier {
-			logger.Error("The provided API key in your auth configuration (`&indexer-api-key=<your_api_key>`) does **NOT** have the required INDEXER_IDENTIFIER claim. Under heavy load, you may get blacklisted by the '/issue' or '/reissue' endpoints", zap.Error(err))
+			if !hasIndexerIdentifier {
+				logger.Error("The provided API key in your auth configuration (`&indexer-api-key=<your_api_key>`) does **NOT** have the required INDEXER_IDENTIFIER claim. Under heavy load, you may get blacklisted by the '/issue' or '/reissue' endpoints", zap.Error(err))
+			}
 		}
 	}
 	return a, nil
@@ -328,9 +329,9 @@ func (a *authenticator) addClaimsToContext(ctx context.Context, token jwt.Token,
 	}
 
 	// Plan tier is not in feature_configs, but given as claim anyway
-	var planTier string
-	if err := token.Get("plan_tier", &planTier); err == nil {
-		trustedHeaders[dauth.HeaderPlanTier] = planTier
+	var substreamsPlanTier string
+	if err := token.Get("plan_tier", &substreamsPlanTier); err == nil {
+		trustedHeaders[dauth.HeaderSubstreamsPlanTier] = substreamsPlanTier
 	}
 
 	a.logger.Debug("added claims", zap.Any("headers", trustedHeaders))

@@ -205,7 +205,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 				headers := dauth.FromContext(ctx)
 				assert.Equal(t, "test-user-123", headers[dauth.HeaderUserID])
 				assert.Equal(t, "api-key-456", headers[dauth.HeaderApiKeyID])
-				assert.Equal(t, "premium", headers[dauth.HeaderPlanTier])
+				assert.Equal(t, "premium", headers[dauth.HeaderSubstreamsPlanTier])
 				assert.Equal(t, "1000", headers["x-max-requests"])
 				assert.Equal(t, "true", headers["x-enable-beta"])
 			},
@@ -499,10 +499,10 @@ func TestAuthenticator_addClaimsToContext(t *testing.T) {
 			},
 			ipAddress: "10.0.0.1",
 			expected: map[string]string{
-				dauth.HeaderUserID:   "user123",
-				dauth.HeaderApiKeyID: "key456",
-				dauth.HeaderPlanTier: "premium",
-				dauth.HeaderIP:       "10.0.0.1",
+				dauth.HeaderUserID:             "user123",
+				dauth.HeaderApiKeyID:           "key456",
+				dauth.HeaderSubstreamsPlanTier: "premium",
+				dauth.HeaderIP:                 "10.0.0.1",
 			},
 		},
 		{

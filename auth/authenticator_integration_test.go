@@ -126,7 +126,7 @@ func TestEndToEndAuthentication(t *testing.T) {
 		trustedHeaders := dauth.FromContext(newCtx)
 		assert.Equal(t, "test-user-123", trustedHeaders[dauth.HeaderUserID])
 		assert.Equal(t, "api-key-456", trustedHeaders[dauth.HeaderApiKeyID])
-		assert.Equal(t, "premium", trustedHeaders[dauth.HeaderPlanTier])
+		assert.Equal(t, "premium", trustedHeaders[dauth.HeaderSubstreamsPlanTier])
 		assert.Equal(t, "192.168.1.1", trustedHeaders[dauth.HeaderIP])
 		assert.Equal(t, "1000", trustedHeaders["x-max-requests"])
 		assert.Equal(t, "true", trustedHeaders["x-enable-feature"])
