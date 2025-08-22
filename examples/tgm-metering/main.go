@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	// Register paymentGateway:// as a valid metering plugin, refers to Register documentation for extra details
+	// Register tgm:// as a valid metering plugin, refers to Register documentation for extra details
 	metering.Register()
 }
 
@@ -21,7 +21,7 @@ func main() {
 	// (as well as any other variables)!
 	//
 	// The [network] query parameter is required and should match the well-know network identifier.
-	pluginDSN := "paymentGateway://abp.thegraph.market?network=eth-mainnet&token=${API_TOKEN}"
+	pluginDSN := "tgm://abp.thegraph.market?network=eth-mainnet&token=${API_TOKEN}"
 
 	eventEmitter, err := dmetering.New(pluginDSN, zap.NewNop())
 	if err != nil {

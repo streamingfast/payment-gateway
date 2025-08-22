@@ -15,7 +15,7 @@ func TestConfig_new(t *testing.T) {
 		expectError bool
 	}{
 		{
-			dsn: "paymentGateway://localhost?buffer=25&network=eth-mainnet",
+			dsn: "payment-gateway://localhost?buffer=25&network=eth-mainnet", // legacy name
 			expect: &Config{
 				Endpoint:   "localhost:443",
 				Network:    "eth-mainnet",
@@ -24,7 +24,16 @@ func TestConfig_new(t *testing.T) {
 			},
 		},
 		{
-			dsn: "paymentGateway://localhost?network=eth-mainnet&plaintext=true",
+			dsn: "tgm://localhost?buffer=25&network=eth-mainnet",
+			expect: &Config{
+				Endpoint:   "localhost:443",
+				Network:    "eth-mainnet",
+				Delay:      100 * time.Millisecond,
+				BufferSize: 25,
+			},
+		},
+		{
+			dsn: "tgm://localhost?network=eth-mainnet&plaintext=true",
 			expect: &Config{
 				Endpoint:   "localhost:443",
 				Network:    "eth-mainnet",
@@ -34,7 +43,7 @@ func TestConfig_new(t *testing.T) {
 			},
 		},
 		{
-			dsn: "paymentGateway://localhost?network=eth-mainnet&insecure=true",
+			dsn: "tgm://localhost?network=eth-mainnet&insecure=true",
 			expect: &Config{
 				Endpoint:   "localhost:443",
 				Network:    "eth-mainnet",
@@ -44,7 +53,7 @@ func TestConfig_new(t *testing.T) {
 			},
 		},
 		{
-			dsn: "paymentGateway://localhost:9010?buffer=25&network=eth-mainnet",
+			dsn: "tgm://localhost:9010?buffer=25&network=eth-mainnet",
 			expect: &Config{
 				Endpoint:   "localhost:9010",
 				Network:    "eth-mainnet",
@@ -53,7 +62,7 @@ func TestConfig_new(t *testing.T) {
 			},
 		},
 		{
-			dsn: "paymentGateway://localhost:9010?buffer=100000&network=eth-mainnet&panicOnDrop=true",
+			dsn: "tgm://localhost:9010?buffer=100000&network=eth-mainnet&panicOnDrop=true",
 			expect: &Config{
 				Endpoint:    "localhost:9010",
 				Network:     "eth-mainnet",
@@ -63,7 +72,7 @@ func TestConfig_new(t *testing.T) {
 			},
 		},
 		{
-			dsn: "paymentGateway://localhost:9010?buffer=100000&network=eth-mainnet&delay=250",
+			dsn: "tgm://localhost:9010?buffer=100000&network=eth-mainnet&delay=250",
 			expect: &Config{
 				Endpoint:   "localhost:9010",
 				Network:    "eth-mainnet",
