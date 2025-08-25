@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,8 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/streamingfast/dauth"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var printBadTokenInLogs = os.Getenv("PRINT_BAD_TOKEN_IN_LOGS") == "true"
@@ -113,12 +116,19 @@ func (a *authenticator) Authenticate(ctx context.Context, path string, headers m
 	if authHeaders, found := lowerHeaders["authorization"]; found && len(authHeaders) > 0 {
 		token, err = a.extractAndParseJWT(authHeaders[0])
 		if err != nil {
-			a.logger.Debug("failed to parse JWT from authorization header", zap.Error(err))
-			return ctx, fmt.Errorf("invalid JWT token: %w", err)
+			// Info() here because there won't be any other trace from the handler function
+			a.logger.Info("failed to parse JWT from authorization header", zap.Error(err), zap.String("ip_address", ipAddress))
+			if errors.Is(err, ErrAuthorizationHeaderFormat) {
+				return ctx, status.Errorf(codes.Unauthenticated, ErrAuthorizationHeaderFormat.Error())
+			}
+			if strings.Contains(err.Error(), "token is expired") {
+				return ctx, status.Errorf(codes.Unauthenticated, "JWT token has expired")
+			}
+			return ctx, status.Errorf(codes.Unauthenticated, "invalid JWT token")
 		}
 
 		needsReissue := a.needsReissue(token)
-		a.logger.Debug("authorization from token", zap.Bool("needsReissue", needsReissue))
+		a.logger.Debug("authorization from token", zap.Bool("needsReissue", needsReissue), zap.String("ip_address", ipAddress))
 
 		if needsReissue {
 			// Extract the actual JWT string from the authorization header
@@ -138,12 +148,15 @@ func (a *authenticator) Authenticate(ctx context.Context, path string, headers m
 		// Handle API key by issuing a new JWT
 		token, err = a.issueJWTFromAPIKey(ctx, apiKeyHeaders[0])
 		if err != nil {
-			a.logger.Debug("failed to issue JWT from API key", zap.Error(err))
-			return ctx, fmt.Errorf("failed to authenticate with API key: %w", err)
+			// Info() here because there won't be any other trace from the handler function
+			a.logger.Info("failed to issue JWT from API key", zap.Error(err), zap.String("ip_address", ipAddress))
+			return ctx, status.Errorf(codes.Unauthenticated, "failed to authenticate with API key: %q", err)
 		}
-		a.logger.Debug("authorization from api key")
+		a.logger.Debug("authorization from api key", zap.String("ip_address", ipAddress))
 	} else {
-		return ctx, fmt.Errorf("required authorization token not found. Please provide a valid JWT token via 'authorization' header or an API key via 'x-api-key' header")
+		// Info() here because there won't be any other trace from the handler function
+		a.logger.Info("invalid unauthenticated request", zap.Error(err), zap.String("ip_address", ipAddress))
+		return ctx, status.Error(codes.Unauthenticated, "required authorization token not found. Please provide a valid JWT token via 'authorization' header or an API key via 'x-api-key' header")
 	}
 
 	// Extract claims from JWT and add to context
@@ -151,6 +164,8 @@ func (a *authenticator) Authenticate(ctx context.Context, path string, headers m
 
 	return ctx, nil
 }
+
+var ErrAuthorizationHeaderFormat = errors.New("authorization header format must be 'Bearer {token}'")
 
 func (a *authenticator) extractAndParseJWT(authHeader string) (jwt.Token, error) {
 	authHeaderParts := strings.Fields(authHeader)
@@ -161,11 +176,11 @@ func (a *authenticator) extractAndParseJWT(authHeader string) (jwt.Token, error)
 		tokenString = authHeaderParts[0]
 	case 2:
 		if strings.ToLower(authHeaderParts[0]) != "bearer" {
-			return nil, fmt.Errorf("authorization header format must be Bearer {token}")
+			return nil, ErrAuthorizationHeaderFormat
 		}
 		tokenString = authHeaderParts[1]
 	default:
-		return nil, fmt.Errorf("authorization header format must be Bearer {token}")
+		return nil, ErrAuthorizationHeaderFormat
 	}
 
 	return a.ParseJWT(tokenString)

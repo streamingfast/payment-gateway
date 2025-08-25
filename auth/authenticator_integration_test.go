@@ -230,6 +230,6 @@ func TestEndToEndAuthentication(t *testing.T) {
 
 		_, err = auth.Authenticate(ctx, "/test/path", headers, "192.168.1.1")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "token is expired")
+		assert.Contains(t, err.Error(), "JWT token has expired")
 	})
 }

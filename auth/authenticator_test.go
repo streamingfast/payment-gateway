@@ -317,7 +317,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 				"Authorization": {"NotBearer " + validJWT},
 			},
 			wantError: true,
-			errorMsg:  "authorization header format must be Bearer",
+			errorMsg:  "authorization header format",
 		},
 		{
 			name: "multiple authorization parts",
@@ -325,7 +325,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 				"Authorization": {"Bearer token extra parts"},
 			},
 			wantError: true,
-			errorMsg:  "authorization header format must be Bearer",
+			errorMsg:  "authorization header format",
 		},
 	}
 
@@ -859,19 +859,19 @@ func TestAuthenticator_extractAndParseJWT(t *testing.T) {
 			name:       "invalid Bearer prefix",
 			authHeader: fmt.Sprintf("Basic %s", validJWT),
 			wantError:  true,
-			errorMsg:   "authorization header format must be Bearer",
+			errorMsg:   "authorization header format",
 		},
 		{
 			name:       "too many parts in header",
 			authHeader: "Bearer token extra",
 			wantError:  true,
-			errorMsg:   "authorization header format must be Bearer",
+			errorMsg:   "authorization header format",
 		},
 		{
 			name:       "empty header",
 			authHeader: "",
 			wantError:  true,
-			errorMsg:   "authorization header format must be Bearer",
+			errorMsg:   "authorization header format",
 		},
 	}
 
