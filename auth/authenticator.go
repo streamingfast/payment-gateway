@@ -19,6 +19,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var printBadTokenInLogs = os.Getenv("PRINT_BAD_TOKEN_IN_LOGS") == "true"
+
 // Register registers the payment gateway authenticator with dauth
 func Register() {
 	dauth.Register("tgm", func(config string, logger *zap.Logger) (dauth.Authenticator, error) {
@@ -181,6 +183,9 @@ func (a *authenticator) ParseJWT(tokenString string) (jwt.Token, error) {
 
 		tok, err := jwt.Parse([]byte(tokenString), jwt.WithKey(jwa.ES256(), key), jwt.WithValidate(true))
 		if err != nil {
+			if printBadTokenInLogs {
+				a.logger.Debug("failed to parse JWT token", zap.String("token", tokenString), zap.Error(err))
+			}
 			lastErr = err
 			continue
 		}
