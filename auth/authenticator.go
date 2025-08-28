@@ -119,7 +119,7 @@ func (a *authenticator) Authenticate(ctx context.Context, path string, headers m
 			// Info() here because there won't be any other trace from the handler function
 			a.logger.Info("failed to parse JWT from authorization header", zap.Error(err), zap.String("ip_address", ipAddress))
 			if errors.Is(err, ErrAuthorizationHeaderFormat) {
-				return ctx, status.Errorf(codes.Unauthenticated, ErrAuthorizationHeaderFormat.Error())
+				return ctx, status.Error(codes.Unauthenticated, ErrAuthorizationHeaderFormat.Error())
 			}
 			if strings.Contains(err.Error(), "token is expired") {
 				return ctx, status.Errorf(codes.Unauthenticated, "JWT token has expired")
