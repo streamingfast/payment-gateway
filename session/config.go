@@ -22,7 +22,7 @@ func newConfig(configURL string) (*Config, error) {
 		Endpoint:                         "session.thegraph.market",
 		Insecure:                         false,
 		Plaintext:                        false,
-		RequestKeepAliveDelay:            30 * time.Second,
+		RequestKeepAliveDelay:            20 * time.Second,
 		DefaultMaxRequestPerUser:         10,
 		DefaultMinimalWorkerLifeDuration: 30 * time.Second,
 	}

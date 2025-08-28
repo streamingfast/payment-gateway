@@ -101,11 +101,11 @@ func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, userID str
 		if grpcErr, ok := status.FromError(err); ok {
 			switch grpcErr.Code() {
 			case codes.Unavailable:
-				return "", fmt.Errorf("failed to borrow session: %w", dsession.ErrUnavailable)
+				return "", fmt.Errorf("%w: %s", dsession.ErrUnavailable, grpcErr.Message())
 			case codes.PermissionDenied:
-				return "", fmt.Errorf("failed to borrow session: %w", dsession.ErrPermissionDenied)
+				return "", fmt.Errorf("%w: %s", dsession.ErrPermissionDenied, grpcErr.Message())
 			case codes.ResourceExhausted:
-				return "", fmt.Errorf("failed to borrow session: %w", dsession.ErrConcurrentStreamLimitExceeded)
+				return "", fmt.Errorf("%w: %s", dsession.ErrQuotaExceeded, grpcErr.Message())
 			}
 		}
 		return "", fmt.Errorf("failed to borrow session: %w", err)
@@ -130,7 +130,7 @@ func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, userID str
 		startKeepAlive(ctx, t.config.RequestKeepAliveDelay, done, t.remoteWorkerPoolClient, key, apiKeyID, onError, t.logger)
 	}
 
-	t.logger.Info("borrowed request worker", zap.String("worker_key", key))
+	t.logger.Debug("borrowed request worker", zap.String("worker_key", key))
 
 	return key, nil
 }
@@ -152,25 +152,7 @@ func (t *tgmSessionPool) Release(sessionKey string) {
 		grpc.WaitForReady(false),
 	)
 
-	if err != nil {
-		// Map gRPC errors to dsession errors for Release operations
-		if grpcErr, ok := status.FromError(err); ok {
-			switch grpcErr.Code() {
-			case codes.Unavailable:
-				t.logger.Error("returning request worker failed - service unavailable", zap.Error(dsession.ErrUnavailable))
-			case codes.PermissionDenied:
-				t.logger.Error("returning request worker failed - permission denied", zap.Error(dsession.ErrPermissionDenied))
-			case codes.ResourceExhausted:
-				t.logger.Error("returning request worker failed - resource exhausted", zap.Error(dsession.ErrConcurrentStreamLimitExceeded))
-			default:
-				t.logger.Error("returning request worker", zap.Error(err))
-			}
-		} else {
-			t.logger.Error("returning request worker", zap.Error(err))
-		}
-	} else {
-		t.logger.Info("returned request worker", zap.String("key", sessionKey), zap.Stringer("status", resp.Status))
-	}
+	t.logger.Debug("returned request worker", zap.String("key", sessionKey), zap.Stringer("status", resp.Status), zap.Error(err))
 }
 
 // createApiKeyInterceptor creates a gRPC unary interceptor that adds the X-Api-Key header
@@ -210,10 +192,11 @@ func startKeepAlive(ctx context.Context, delay time.Duration, done <-chan struct
 						if grpcErr, ok := status.FromError(err); ok {
 							switch grpcErr.Code() {
 							case codes.PermissionDenied:
-								onError(fmt.Errorf("keep-alive failed: %w", dsession.ErrPermissionDenied))
+								onError(fmt.Errorf("%w: %s", dsession.ErrPermissionDenied, grpcErr.Message()))
 								return
 							case codes.ResourceExhausted:
-								onError(fmt.Errorf("keep-alive failed: %w", dsession.ErrConcurrentStreamLimitExceeded))
+								onError(fmt.Errorf("%w: %s", dsession.ErrQuotaExceeded, grpcErr.Message()))
+								return
 							}
 						}
 						delay = time.Second
