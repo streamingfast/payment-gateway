@@ -548,6 +548,8 @@ github.com/sirupsen/logrus v1.6.0/go.mod h1:7uNnSEd1DgxDLC74fIahvMZmmYsHGZGEOFrf
 github.com/spf13/afero v1.10.0 h1:EaGW2JJh15aKOejeuJ+wpFSHnbd7GE6Wvp3TsNhb6LY=
 github.com/spf13/afero v1.10.0/go.mod h1:UBogFpq8E9Hx+xc5CNTTEpTnuHVmXDwZcZcE1eb/UhQ=
 github.com/streamingfast/dgrpc v0.0.0-20230616153353-6bbf5534a79a/go.mod h1:e0CV14wi/p11xLBcIZgPIyBxy7CcQTqX2498DuQQHTg=
+github.com/streamingfast/dsession v0.0.0-20250828130525-1559ad0fd92d h1:gq5JtXH1DMq6AWAhva8Iwqdd6DArQY7ZxrJMUWZawQ4=
+github.com/streamingfast/dsession v0.0.0-20250828130525-1559ad0fd92d/go.mod h1:Y+lupU4OpZ9xQI1o5Jt4SgsBSe/xr6S+/7RJMoWCb4E=
 github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a/go.mod h1:bqiYZaX6L/MoXNfFQeAdau6g9HLA3yKHkX8KzStt58Q=
 github.com/streamingfast/logging v0.0.0-20210811175431-f3b44b61606a/go.mod h1:4GdqELhZOXj4xwc4IaBmzofzdErGynnaSzuzxy0ZIBo=
 github.com/streamingfast/sf-tracing v0.0.0-20230518173934-07a78a90432e/go.mod h1:Apcb4QwMpbFurrJQEIwz2LtQQZNMYkSO0IuZu1lGM8k=

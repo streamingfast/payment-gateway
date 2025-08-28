@@ -26,6 +26,7 @@ func TestConfig_new(t *testing.T) {
 				RequestKeepAliveDelay:            30 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
+				IndexerApiKey:                    "",
 			},
 		},
 		{
@@ -38,6 +39,7 @@ func TestConfig_new(t *testing.T) {
 				RequestKeepAliveDelay:            30 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
+				IndexerApiKey:                    "",
 			},
 		},
 		{
@@ -50,6 +52,7 @@ func TestConfig_new(t *testing.T) {
 				RequestKeepAliveDelay:            30 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
+				IndexerApiKey:                    "",
 			},
 		},
 		{
@@ -62,6 +65,7 @@ func TestConfig_new(t *testing.T) {
 				RequestKeepAliveDelay:            30 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
+				IndexerApiKey:                    "",
 			},
 		},
 		{
@@ -74,6 +78,7 @@ func TestConfig_new(t *testing.T) {
 				RequestKeepAliveDelay:            30 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
+				IndexerApiKey:                    "",
 			},
 		},
 		{
@@ -86,6 +91,7 @@ func TestConfig_new(t *testing.T) {
 				RequestKeepAliveDelay:            45 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
+				IndexerApiKey:                    "",
 			},
 		},
 		{
@@ -98,6 +104,7 @@ func TestConfig_new(t *testing.T) {
 				RequestKeepAliveDelay:            30 * time.Second,
 				DefaultMaxRequestPerUser:         20,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
+				IndexerApiKey:                    "",
 			},
 		},
 		{
@@ -110,6 +117,7 @@ func TestConfig_new(t *testing.T) {
 				RequestKeepAliveDelay:            30 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 10 * time.Minute,
+				IndexerApiKey:                    "",
 			},
 		},
 		{
@@ -122,6 +130,7 @@ func TestConfig_new(t *testing.T) {
 				RequestKeepAliveDelay:            60 * time.Second,
 				DefaultMaxRequestPerUser:         50,
 				DefaultMinimalWorkerLifeDuration: 15 * time.Minute,
+				IndexerApiKey:                    "",
 			},
 		},
 		{
@@ -141,6 +150,32 @@ func TestConfig_new(t *testing.T) {
 			dsn:         "tgm://session.thegraph.market?request-keep-alive-delay=invalid",
 			expectError: true,
 			errorMsg:    "invalid request-keep-alive-delay",
+		},
+		{
+			name: "indexer API key",
+			dsn:  "tgm://session.thegraph.market?indexer-api-key=server_1234567890abcdef",
+			expect: &Config{
+				Endpoint:                         "session.thegraph.market",
+				Insecure:                         false,
+				Plaintext:                        false,
+				RequestKeepAliveDelay:            30 * time.Second,
+				DefaultMaxRequestPerUser:         10,
+				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
+				IndexerApiKey:                    "server_1234567890abcdef",
+			},
+		},
+		{
+			name: "all parameters with indexer API key",
+			dsn:  "tgm://custom.session.com:9090?insecure=true&plaintext=true&request-keep-alive-delay=60s&default-max-request-per-user=50&default-minimal-worker-life-duration=15m&indexer-api-key=server_abcdef123456",
+			expect: &Config{
+				Endpoint:                         "custom.session.com:9090",
+				Insecure:                         true,
+				Plaintext:                        true,
+				RequestKeepAliveDelay:            60 * time.Second,
+				DefaultMaxRequestPerUser:         50,
+				DefaultMinimalWorkerLifeDuration: 15 * time.Minute,
+				IndexerApiKey:                    "server_abcdef123456",
+			},
 		},
 		{
 			name:        "invalid max request per user",
@@ -164,6 +199,7 @@ func TestConfig_new(t *testing.T) {
 				RequestKeepAliveDelay:            30 * time.Second,
 				DefaultMaxRequestPerUser:         0,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
+				IndexerApiKey:                    "",
 			},
 		},
 		{
@@ -176,6 +212,7 @@ func TestConfig_new(t *testing.T) {
 				RequestKeepAliveDelay:            100 * time.Millisecond,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 1 * time.Second,
+				IndexerApiKey:                    "",
 			},
 		},
 	}
@@ -206,6 +243,7 @@ func TestConfig_DefaultValues(t *testing.T) {
 	assert.Equal(t, 30*time.Second, c.RequestKeepAliveDelay)
 	assert.Equal(t, uint64(10), c.DefaultMaxRequestPerUser)
 	assert.Equal(t, 30*time.Second, c.DefaultMinimalWorkerLifeDuration)
+	assert.Equal(t, "", c.IndexerApiKey)
 }
 
 func TestConfig_BooleanParameters(t *testing.T) {

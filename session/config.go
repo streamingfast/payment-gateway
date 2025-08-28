@@ -14,6 +14,7 @@ type Config struct {
 	RequestKeepAliveDelay            time.Duration // delay between keep alive requests
 	DefaultMaxRequestPerUser         uint64        // default maximum requests per user
 	DefaultMinimalWorkerLifeDuration time.Duration // default minimal worker life duration
+	IndexerApiKey                    string        // indexer API key for X-Api-Key header
 }
 
 func newConfig(configURL string) (*Config, error) {
@@ -55,7 +56,8 @@ func newConfig(configURL string) (*Config, error) {
 	vals := u.Query()
 	for k := range vals {
 		if k == "insecure" || k == "plaintext" || k == "request-keep-alive-delay" ||
-			k == "default-max-request-per-user" || k == "default-minimal-worker-life-duration" {
+			k == "default-max-request-per-user" || k == "default-minimal-worker-life-duration" ||
+			k == "indexer-api-key" {
 			continue
 		}
 		return nil, fmt.Errorf("unknown query parameter: %s", k)
@@ -94,6 +96,11 @@ func newConfig(configURL string) (*Config, error) {
 			return nil, fmt.Errorf("invalid default-minimal-worker-life-duration: %w", err)
 		}
 		c.DefaultMinimalWorkerLifeDuration = duration
+	}
+
+	// Parse indexer-api-key if provided
+	if apiKey := vals.Get("indexer-api-key"); apiKey != "" {
+		c.IndexerApiKey = apiKey
 	}
 
 	return c, nil

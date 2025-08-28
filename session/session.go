@@ -8,13 +8,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dsession"
 	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -34,15 +36,18 @@ func Register() {
 type tgmSessionPool struct {
 	config                 *Config
 	logger                 *zap.Logger
-	globalRequestPool      *GlobalRequestPool
 	remoteWorkerPoolClient pbworker.WorkerPoolClient
 	conn                   *grpc.ClientConn
+	sessionClosers         map[string]chan struct{}
+	sessionMutex           sync.Mutex
+}
+
+type borrowedSession struct {
+	done chan struct{}
 }
 
 func newTGMSessionPool(config *Config, logger *zap.Logger) (dsession.SessionPool, error) {
 	logger = logger.Named("tgm-session-pool")
-
-	// Determine the connection scheme (removed unused variable)
 
 	// Create gRPC connection
 	var opts []grpc.DialOption
@@ -56,6 +61,11 @@ func newTGMSessionPool(config *Config, logger *zap.Logger) (dsession.SessionPool
 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
 	}
 
+	// Add unary interceptor for X-Api-Key header if API key is provided
+	if config.IndexerApiKey != "" {
+		opts = append(opts, grpc.WithUnaryInterceptor(createApiKeyInterceptor(config.IndexerApiKey)))
+	}
+
 	conn, err := grpc.Dial(config.Endpoint, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to session endpoint %s: %w", config.Endpoint, err)
@@ -63,101 +73,20 @@ func newTGMSessionPool(config *Config, logger *zap.Logger) (dsession.SessionPool
 
 	client := pbworker.NewWorkerPoolClient(conn)
 
-	globalPool := NewGlobalRequestPool(
-		client,
-		config.RequestKeepAliveDelay,
-		config.DefaultMaxRequestPerUser,
-		config.DefaultMinimalWorkerLifeDuration,
-		logger,
-	)
-
 	pool := &tgmSessionPool{
 		config:                 config,
 		logger:                 logger,
-		globalRequestPool:      globalPool,
 		remoteWorkerPoolClient: client,
 		conn:                   conn,
+		sessionClosers:         make(map[string]chan struct{}),
+		sessionMutex:           sync.Mutex{},
 	}
 
 	return pool, nil
 }
 
 func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, userID string, apiKeyID string, traceID string, onError func(error)) (string, error) {
-	borrowedRequest, err := t.globalRequestPool.BorrowRequest(ctx, serviceName, userID, apiKeyID, traceID)
-	if err != nil {
-		return "", fmt.Errorf("failed to borrow session: %w", err)
-	}
-
-	// Store the borrowed request for later release
-	t.globalRequestPool.storeBorrowedRequest(borrowedRequest.key, borrowedRequest)
-
-	return borrowedRequest.key, nil
-}
-
-func (t *tgmSessionPool) Release(sessionKey, apiKeyID string) {
-	if borrowedRequest := t.globalRequestPool.getBorrowedRequest(sessionKey); borrowedRequest != nil {
-		t.globalRequestPool.ReturnRequest(borrowedRequest)
-		t.globalRequestPool.removeBorrowedRequest(sessionKey)
-	}
-}
-
-// tgmSession implements Session
-type tgmSession struct {
-	borrowedRequest   *BorrowedRequest
-	globalRequestPool *GlobalRequestPool
-	logger            *zap.Logger
-}
-
-func (s *tgmSession) WorkerKey() string {
-	return s.borrowedRequest.key
-}
-
-func (s *tgmSession) Status() string {
-	return s.borrowedRequest.status.String()
-}
-
-func (s *tgmSession) IsResourceExhausted() bool {
-	return s.borrowedRequest.status == pbworker.BorrowWorkerResponse_resource_exhausted
-}
-
-func (s *tgmSession) WorkerState() *pbworker.WorkersState {
-	return s.borrowedRequest.state
-}
-
-func (s *tgmSession) Close() error {
-	s.globalRequestPool.ReturnRequest(s.borrowedRequest)
-	return nil
-}
-
-// GlobalRequestPool manages worker requests
-type GlobalRequestPool struct {
-	userBorrowedRequest              map[string]uint64
-	borrowedRequests                 map[string]*BorrowedRequest
-	borrowedRequestMutex             sync.Mutex
-	remoteWorkerPoolClient           pbworker.WorkerPoolClient
-	requestKeepAliveDelay            time.Duration
-	logger                           *zap.Logger
-	defaultMaxRequestPerUser         uint64
-	defaultMinimalWorkerLifeDuration time.Duration
-}
-
-func NewGlobalRequestPool(remoteWorkerPoolClient pbworker.WorkerPoolClient, requestKeepAliveDelay time.Duration, defaultMaxRequestPerUser uint64, defaultMinimalWorkerLifeDuration time.Duration, logger *zap.Logger) *GlobalRequestPool {
-	logger = logger.Named("global-request-pool")
-
-	return &GlobalRequestPool{
-		userBorrowedRequest:              make(map[string]uint64),
-		borrowedRequests:                 make(map[string]*BorrowedRequest),
-		borrowedRequestMutex:             sync.Mutex{},
-		remoteWorkerPoolClient:           remoteWorkerPoolClient,
-		requestKeepAliveDelay:            requestKeepAliveDelay,
-		defaultMaxRequestPerUser:         defaultMaxRequestPerUser,
-		defaultMinimalWorkerLifeDuration: defaultMinimalWorkerLifeDuration,
-		logger:                           logger,
-	}
-}
-
-func (p *GlobalRequestPool) BorrowRequest(ctx context.Context, serviceName string, userID string, apiKeyID string, traceID string) (*BorrowedRequest, error) {
-	resp, err := p.remoteWorkerPoolClient.BorrowWorker(ctx,
+	resp, err := t.remoteWorkerPoolClient.BorrowWorker(ctx,
 		&pbworker.BorrowWorkerRequest{
 			Service:  serviceName,
 			UserId:   userID,
@@ -168,134 +97,131 @@ func (p *GlobalRequestPool) BorrowRequest(ctx context.Context, serviceName strin
 	)
 
 	if err != nil {
-		return nil, err
+		// Map gRPC errors to dsession errors
+		if grpcErr, ok := status.FromError(err); ok {
+			switch grpcErr.Code() {
+			case codes.Unavailable:
+				return "", fmt.Errorf("failed to borrow session: %w", dsession.ErrUnavailable)
+			case codes.PermissionDenied:
+				return "", fmt.Errorf("failed to borrow session: %w", dsession.ErrPermissionDenied)
+			case codes.ResourceExhausted:
+				return "", fmt.Errorf("failed to borrow session: %w", dsession.ErrConcurrentStreamLimitExceeded)
+			}
+		}
+		return "", fmt.Errorf("failed to borrow session: %w", err)
 	}
 
 	key := resp.WorkerKey
 	workerStatus := resp.Status
-	state := resp.WorkerState
-	minimalWorkerLifeDuration := resp.MinimalWorkerLifeDuration.AsDuration()
-
-	r := NewBorrowedRequest(key, userID, workerStatus, state, minimalWorkerLifeDuration, p.logger)
 
 	if workerStatus == pbworker.BorrowWorkerResponse_resource_exhausted {
-		p.logger.Info("worker pool is exhausted", zap.String("worker_key", key), zap.String("status", workerStatus.String()))
-		return r, nil
+		t.logger.Info("worker pool is exhausted", zap.String("worker_key", key), zap.String("status", workerStatus.String()))
+		return "", fmt.Errorf("worker pool exhausted: %w", dsession.ErrConcurrentStreamLimitExceeded)
 	}
 
-	p.borrowedRequestMutex.Lock()
-	p.userBorrowedRequest[userID]++
-	p.borrowedRequestMutex.Unlock()
+	// Start keep-alive for borrowed workers
+	if workerStatus == pbworker.BorrowWorkerResponse_borrowed {
 
-	r.startKeepAlive(ctx, p.requestKeepAliveDelay, p.remoteWorkerPoolClient)
+		done := make(chan struct{})
+		t.sessionMutex.Lock()
+		t.sessionClosers[key] = done
+		t.sessionMutex.Unlock()
 
-	p.logger.Info("borrowed request worker", zap.String("worker_key", key))
+		startKeepAlive(ctx, t.config.RequestKeepAliveDelay, done, t.remoteWorkerPoolClient, key, apiKeyID, onError, t.logger)
+	}
 
-	return r, nil
+	t.logger.Info("borrowed request worker", zap.String("worker_key", key))
+
+	return key, nil
 }
 
-func (p *GlobalRequestPool) storeBorrowedRequest(key string, request *BorrowedRequest) {
-	p.borrowedRequestMutex.Lock()
-	defer p.borrowedRequestMutex.Unlock()
-	p.borrowedRequests[key] = request
-}
+func (t *tgmSessionPool) Release(sessionKey string) {
+	t.sessionMutex.Lock()
+	done := t.sessionClosers[sessionKey]
+	if done != nil {
+		close(done)
+		delete(t.sessionClosers, sessionKey)
+	}
+	t.sessionMutex.Unlock()
 
-func (p *GlobalRequestPool) getBorrowedRequest(key string) *BorrowedRequest {
-	p.borrowedRequestMutex.Lock()
-	defer p.borrowedRequestMutex.Unlock()
-	return p.borrowedRequests[key]
-}
-
-func (p *GlobalRequestPool) removeBorrowedRequest(key string) {
-	p.borrowedRequestMutex.Lock()
-	defer p.borrowedRequestMutex.Unlock()
-	delete(p.borrowedRequests, key)
-}
-
-func (p *GlobalRequestPool) ReturnRequest(r *BorrowedRequest) {
-	r.StopKeepAlive()
-
-	p.borrowedRequestMutex.Lock()
-	p.userBorrowedRequest[r.userID]--
-	p.borrowedRequestMutex.Unlock()
-
-	resp, err := p.remoteWorkerPoolClient.ReturnWorker(context.Background(),
+	resp, err := t.remoteWorkerPoolClient.ReturnWorker(context.Background(),
 		&pbworker.ReturnWorkerRequest{
-			WorkerKey:                 r.key,
-			MinimalWorkerLifeDuration: durationpb.New(r.minimalWorkerLifeDuration),
+			WorkerKey:                 sessionKey,
+			MinimalWorkerLifeDuration: durationpb.New(t.config.DefaultMinimalWorkerLifeDuration),
 		},
 		grpc.WaitForReady(false),
 	)
 
 	if err != nil {
-		p.logger.Error("returning request worker", zap.Error(err))
+		// Map gRPC errors to dsession errors for Release operations
+		if grpcErr, ok := status.FromError(err); ok {
+			switch grpcErr.Code() {
+			case codes.Unavailable:
+				t.logger.Error("returning request worker failed - service unavailable", zap.Error(dsession.ErrUnavailable))
+			case codes.PermissionDenied:
+				t.logger.Error("returning request worker failed - permission denied", zap.Error(dsession.ErrPermissionDenied))
+			case codes.ResourceExhausted:
+				t.logger.Error("returning request worker failed - resource exhausted", zap.Error(dsession.ErrConcurrentStreamLimitExceeded))
+			default:
+				t.logger.Error("returning request worker", zap.Error(err))
+			}
+		} else {
+			t.logger.Error("returning request worker", zap.Error(err))
+		}
 	} else {
-		p.logger.Info("returned request worker", zap.String("key", r.key), zap.Stringer("status", resp.Status))
+		t.logger.Info("returned request worker", zap.String("key", sessionKey), zap.Stringer("status", resp.Status))
 	}
 }
 
-// BorrowedRequest represents a borrowed worker session
-type BorrowedRequest struct {
-	key                       string
-	userID                    string
-	status                    pbworker.BorrowWorkerResponse_BorrowStatus
-	state                     *pbworker.WorkersState
-	minimalWorkerLifeDuration time.Duration
-	logger                    *zap.Logger
-	done                      chan struct{}
-}
-
-func NewBorrowedRequest(key string, userID string, status pbworker.BorrowWorkerResponse_BorrowStatus, state *pbworker.WorkersState, minimalWorkerLifeDuration time.Duration, logger *zap.Logger) *BorrowedRequest {
-	logger = logger.Named("borrowed-request")
-	return &BorrowedRequest{
-		key:                       key,
-		userID:                    userID,
-		status:                    status,
-		state:                     state,
-		minimalWorkerLifeDuration: minimalWorkerLifeDuration,
-		done:                      make(chan struct{}),
-		logger:                    logger,
+// createApiKeyInterceptor creates a gRPC unary interceptor that adds the X-Api-Key header
+func createApiKeyInterceptor(apiKey string) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		// Add the X-Api-Key header to the outgoing metadata
+		ctx = metadata.AppendToOutgoingContext(ctx, "X-Api-Key", apiKey)
+		return invoker(ctx, method, req, reply, cc, opts...)
 	}
 }
 
-func (r *BorrowedRequest) startKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient) {
-	apiKeyID := dauth.FromContext(ctx).APIKeyID()
+// startKeepAlive starts the keep-alive goroutine for a borrowed session
+func startKeepAlive(ctx context.Context, delay time.Duration, done <-chan struct{}, client pbworker.WorkerPoolClient, workerKey, apiKeyID string, onError func(error), logger *zap.Logger) {
+	originalDelay := delay
 
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-r.done:
+			case <-done:
 				return
 			case <-time.After(delay):
-				_, err := remoteWorkerPoolClient.KeepAlive(
+				delay = originalDelay
+				_, err := client.KeepAlive(
 					ctx,
 					&pbworker.KeepAliveRequest{
-						WorkerKey: r.key,
+						WorkerKey: workerKey,
 						ApiKeyId:  apiKeyID,
 					},
 					grpc.WaitForReady(false),
 				)
 				if err != nil {
-					// FIXME: add some retry with smaller delay, handle specific errors here
-					r.logger.Error("failed to call keep request worker alive", zap.String("worker_id", r.key), zap.Error(err))
-					//reqctx.CancelFunc(ctx)(err)
-					return
+					logger.Error("failed to call keep request worker alive", zap.String("worker_id", workerKey), zap.Error(err))
+					if onError != nil {
+						// Map gRPC errors to dsession errors
+						if grpcErr, ok := status.FromError(err); ok {
+							switch grpcErr.Code() {
+							case codes.PermissionDenied:
+								onError(fmt.Errorf("keep-alive failed: %w", dsession.ErrPermissionDenied))
+								return
+							case codes.ResourceExhausted:
+								onError(fmt.Errorf("keep-alive failed: %w", dsession.ErrConcurrentStreamLimitExceeded))
+							}
+						}
+						delay = time.Second
+						logger.Info("keep-alive failed, retrying", zap.String("worker_id", workerKey), zap.Error(err), zap.Duration("delay", delay))
+						continue
+					}
 				}
 			}
 		}
 	}()
-}
-
-func (r *BorrowedRequest) StopKeepAlive() {
-	close(r.done)
-}
-
-// Helper function to extract trace ID from context
-// This is a placeholder - you'll need to implement based on your tracing setup
-func getTraceIDFromContext(ctx context.Context) string {
-	// Implementation depends on your tracing framework (e.g., OpenTelemetry, Jaeger, etc.)
-	// For now, return empty string
-	return ""
 }
