@@ -1,11 +1,6 @@
-go 1.23.0
+go 1.24.2
 
-toolchain go1.24.2
-
-// We commit this files to make it easier to run and develop the examples,
-// don't forget from time to time to run `go get github.com/streamingfast/payment-gateway`
-// inside ./examples to update the dependencies.
-
-use .
-
-use ./examples
+use (
+	.
+	./examples
+)
