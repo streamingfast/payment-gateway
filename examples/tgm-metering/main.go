@@ -15,13 +15,13 @@ func init() {
 }
 
 func main() {
-	checkEnv("API_TOKEN")
+	checkEnv("API_KEY")
 
 	// The ${API_TOKEN} is expanded automatically by the metering plugin via your defind environment variables
 	// (as well as any other variables)!
 	//
 	// The [network] query parameter is required and should match the well-know network identifier.
-	pluginDSN := "tgm://abp.thegraph.market?network=eth-mainnet&token=${API_TOKEN}"
+	pluginDSN := "tgm://abp.thegraph.market?network=eth-mainnet&api_key=${API_KEY}"
 
 	eventEmitter, err := dmetering.New(pluginDSN, zap.NewNop())
 	if err != nil {

@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/oauth"
+	"google.golang.org/grpc/metadata"
 )
 
 // FIXME: This is super similar to https://github.com/dfuse-io/dmetering/blob/4d001fb2b225632174a30f7fb97e98c0d7fb904f/grpc/emitter.go.
@@ -202,6 +203,8 @@ func newGatewayClient(config *Config) (pbgateway.UsageServiceClient, CloseFunc, 
 		opts = append(opts, grpc.WithPerRPCCredentials(oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
 			AccessToken: config.Token,
 		})}))
+	} else if config.ApiKey != "" {
+		opts = append(opts, grpc.WithUnaryInterceptor(createApiKeyInterceptor(config.ApiKey)))
 	}
 
 	conn, err := dgrpc.NewClientConn(config.Endpoint, opts...)
@@ -210,4 +213,13 @@ func newGatewayClient(config *Config) (pbgateway.UsageServiceClient, CloseFunc, 
 	}
 
 	return pbgateway.NewUsageServiceClient(conn), conn.Close, nil
+}
+
+// createApiKeyInterceptor creates a gRPC unary interceptor that adds the X-Api-Key header
+func createApiKeyInterceptor(apiKey string) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		// Add the X-Api-Key header to the outgoing metadata
+		ctx = metadata.AppendToOutgoingContext(ctx, "X-Api-Key", apiKey)
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
 }

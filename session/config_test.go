@@ -23,7 +23,7 @@ func TestConfig_new(t *testing.T) {
 				Endpoint:                         "session.thegraph.market",
 				Insecure:                         false,
 				Plaintext:                        false,
-				RequestKeepAliveDelay:            30 * time.Second,
+				RequestKeepAliveDelay:            20 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
 				IndexerApiKey:                    "",
@@ -36,7 +36,7 @@ func TestConfig_new(t *testing.T) {
 				Endpoint:                         "session.thegraph.market",
 				Insecure:                         false,
 				Plaintext:                        false,
-				RequestKeepAliveDelay:            30 * time.Second,
+				RequestKeepAliveDelay:            20 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
 				IndexerApiKey:                    "",
@@ -49,7 +49,7 @@ func TestConfig_new(t *testing.T) {
 				Endpoint:                         "custom.thegraph.market",
 				Insecure:                         false,
 				Plaintext:                        false,
-				RequestKeepAliveDelay:            30 * time.Second,
+				RequestKeepAliveDelay:            20 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
 				IndexerApiKey:                    "",
@@ -62,7 +62,7 @@ func TestConfig_new(t *testing.T) {
 				Endpoint:                         "session.example.com:8080",
 				Insecure:                         false,
 				Plaintext:                        false,
-				RequestKeepAliveDelay:            30 * time.Second,
+				RequestKeepAliveDelay:            20 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
 				IndexerApiKey:                    "",
@@ -75,7 +75,7 @@ func TestConfig_new(t *testing.T) {
 				Endpoint:                         "localhost:8080",
 				Insecure:                         true,
 				Plaintext:                        true,
-				RequestKeepAliveDelay:            30 * time.Second,
+				RequestKeepAliveDelay:            20 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
 				IndexerApiKey:                    "",
@@ -101,7 +101,7 @@ func TestConfig_new(t *testing.T) {
 				Endpoint:                         "session.thegraph.market",
 				Insecure:                         false,
 				Plaintext:                        false,
-				RequestKeepAliveDelay:            30 * time.Second,
+				RequestKeepAliveDelay:            20 * time.Second,
 				DefaultMaxRequestPerUser:         20,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
 				IndexerApiKey:                    "",
@@ -114,7 +114,7 @@ func TestConfig_new(t *testing.T) {
 				Endpoint:                         "session.thegraph.market",
 				Insecure:                         false,
 				Plaintext:                        false,
-				RequestKeepAliveDelay:            30 * time.Second,
+				RequestKeepAliveDelay:            20 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 10 * time.Minute,
 				IndexerApiKey:                    "",
@@ -158,7 +158,7 @@ func TestConfig_new(t *testing.T) {
 				Endpoint:                         "session.thegraph.market",
 				Insecure:                         false,
 				Plaintext:                        false,
-				RequestKeepAliveDelay:            30 * time.Second,
+				RequestKeepAliveDelay:            20 * time.Second,
 				DefaultMaxRequestPerUser:         10,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
 				IndexerApiKey:                    "server_1234567890abcdef",
@@ -196,7 +196,7 @@ func TestConfig_new(t *testing.T) {
 				Endpoint:                         "session.thegraph.market",
 				Insecure:                         false,
 				Plaintext:                        false,
-				RequestKeepAliveDelay:            30 * time.Second,
+				RequestKeepAliveDelay:            20 * time.Second,
 				DefaultMaxRequestPerUser:         0,
 				DefaultMinimalWorkerLifeDuration: 30 * time.Second,
 				IndexerApiKey:                    "",
@@ -240,7 +240,7 @@ func TestConfig_DefaultValues(t *testing.T) {
 	assert.Equal(t, "session.thegraph.market", c.Endpoint)
 	assert.False(t, c.Insecure)
 	assert.False(t, c.Plaintext)
-	assert.Equal(t, 30*time.Second, c.RequestKeepAliveDelay)
+	assert.Equal(t, 20*time.Second, c.RequestKeepAliveDelay)
 	assert.Equal(t, uint64(10), c.DefaultMaxRequestPerUser)
 	assert.Equal(t, 30*time.Second, c.DefaultMinimalWorkerLifeDuration)
 	assert.Equal(t, "", c.IndexerApiKey)

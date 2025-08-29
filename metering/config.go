@@ -12,6 +12,7 @@ type Config struct {
 	Insecure    bool
 	Plaintext   bool
 	Token       string
+	ApiKey      string
 	Delay       time.Duration
 	BufferSize  uint64
 	PanicOnDrop bool
@@ -54,6 +55,7 @@ func newConfig(configURL string) (*Config, error) {
 	}
 
 	c.Token = vals.Get("token")
+	c.ApiKey = vals.Get("api_key")
 
 	c.Network = vals.Get("network")
 	if c.Network == "" {

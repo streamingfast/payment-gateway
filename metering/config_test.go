@@ -84,6 +84,26 @@ func TestConfig_new(t *testing.T) {
 			dsn:         "paymentGateway:localhost9010?buffer=100000&network=eth-mainnet&panicOnDrop=true",
 			expectError: true,
 		},
+		{
+			dsn: "tgm://metering.thegraph.market?network=eth-mainnet&api_key=server_12345",
+			expect: &Config{
+				Endpoint:   "metering.thegraph.market:443",
+				Network:    "eth-mainnet",
+				Delay:      100 * time.Millisecond,
+				BufferSize: 10000,
+				ApiKey:     "server_12345",
+			},
+		},
+		{
+			dsn: "tgm://metering.thegraph.market?network=mynet&token=someJWT",
+			expect: &Config{
+				Endpoint:   "metering.thegraph.market:443",
+				Network:    "mynet",
+				Delay:      100 * time.Millisecond,
+				BufferSize: 10000,
+				Token:      "someJWT",
+			},
+		},
 	}
 
 	for _, test := range tests {
