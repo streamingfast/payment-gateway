@@ -17,7 +17,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // Register registers the TGM session pool with dauth
@@ -179,13 +178,12 @@ func (t *tgmSessionPool) Release(sessionKey string) {
 
 		resp, err := t.remoteWorkerPoolClient.ReturnWorker(context.Background(),
 			&pbworker.ReturnWorkerRequest{
-				WorkerKey:                 sessionKey,
-				MinimalWorkerLifeDuration: durationpb.New(t.config.DefaultMinimalWorkerLifeDuration),
+				WorkerKey: sessionKey,
 			},
 			grpc.WaitForReady(false),
 		)
 
-		t.logger.Debug("returned request worker", zap.String("key", sessionKey), zap.Stringer("status", resp.Status), zap.Error(err))
+		t.logger.Debug("returned request worker", zap.String("key", sessionKey), zap.Stringer("status", resp.GetStatus()), zap.Error(err))
 	}()
 }
 
@@ -268,12 +266,11 @@ func (t *tgmSessionPool) releaseWorkerInternal(workerKey string) {
 	resp, err := t.remoteWorkerPoolClient.ReturnWorker(context.Background(),
 		&pbworker.ReturnWorkerRequest{
 			WorkerKey: workerKey,
-			// No MinimalWorkerLifeDuration must be set on the workers, it's only for the Session
 		},
 		grpc.WaitForReady(false),
 	)
 
-	t.logger.Debug("returned worker", zap.String("key", workerKey), zap.Stringer("status", resp.Status), zap.Error(err))
+	t.logger.Debug("returned worker", zap.String("key", workerKey), zap.Stringer("status", resp.GetStatus()), zap.Error(err))
 }
 
 // createApiKeyInterceptor creates a gRPC unary interceptor that adds the X-Api-Key header

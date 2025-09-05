@@ -26,6 +26,5 @@ Configure via URL string with parameters:
 - `plaintext=true` - Use unencrypted connections
 - `request-keep-alive-delay=30s` - Keep-alive interval
 - `default-max-request-per-user=10` - Max concurrent sessions per user
-- `default-minimal-worker-life-duration=30s` - Minimum worker lifetime
 
 Example: `tgm://session.example.com?insecure=true&request-keep-alive-delay=60s`
