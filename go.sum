@@ -167,8 +167,8 @@ github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e h1:neZjd9F
 github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e/go.mod h1:UqWuX3REU/IInBUaymFN2eLjuvz+/0SsoUFjeQlLNyI=
 github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed h1:b6EFwgne8MSK4kUjvulyyg2GGyvVUgQ+xY6o8eXlFIA=
 github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed/go.mod h1:JbxEDbzWRG1dHdNIPrYfuPllEkktZMgm40AwVIBENcw=
-github.com/streamingfast/dsession v0.0.0-20250828135210-0b74c3e1ed99 h1:hbucaPtA7Ni6sPmMNCBRIuyXkIAVg5sSBxhL/Zc2SOM=
-github.com/streamingfast/dsession v0.0.0-20250828135210-0b74c3e1ed99/go.mod h1:Y+lupU4OpZ9xQI1o5Jt4SgsBSe/xr6S+/7RJMoWCb4E=
+github.com/streamingfast/dsession v0.0.0-20250904235523-ffe9952a12d3 h1:ac3B2DEwI8HukbQ4fwuPJZ3ueoN5n/nG7PejzUlDbYE=
+github.com/streamingfast/dsession v0.0.0-20250904235523-ffe9952a12d3/go.mod h1:kqI1XgeJMlEVX2koyc/AlNayJinzru+Ttf2NXavIm4w=
 github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424 h1:qKt1W13L7GXL3xqvD6z2ufSkIy/KDm9oGrfurypC78E=
 github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424/go.mod h1:VlduQ80JcGJSargkRU4Sg9Xo63wZD/l8A5NC/Uo1/uU=
 github.com/streamingfast/sf-tracing v0.0.0-20240209202324-9daa52c71a52 h1:D9M3b2mTrvnvjGpFFd/JqZ/GSPoUrWU2zrtRpDOyqao=

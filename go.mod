@@ -10,7 +10,7 @@ require (
 	github.com/streamingfast/dgrpc v0.0.0-20240423143010-f36784700c9a
 	github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e
 	github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed
-	github.com/streamingfast/dsession v0.0.0-20250828135210-0b74c3e1ed99
+	github.com/streamingfast/dsession v0.0.0-20250904235523-ffe9952a12d3
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20250826200931-136a043ecece
 	github.com/stretchr/testify v1.11.1

@@ -33,12 +33,20 @@ func Register() {
 	})
 }
 
+type sessionInfo struct {
+	userID   string
+	apiKeyID string
+	traceID  string
+	workers  map[string]struct{} // Track worker keys for this session
+	closer   chan struct{}       // Channel to signal session closure
+}
+
 type tgmSessionPool struct {
 	config                 *Config
 	logger                 *zap.Logger
 	remoteWorkerPoolClient pbworker.WorkerPoolClient
 	conn                   *grpc.ClientConn
-	sessionClosers         map[string]chan struct{}
+	sessions               map[string]*sessionInfo // Map sessionKey -> session info
 	sessionMutex           sync.Mutex
 }
 
@@ -78,7 +86,7 @@ func newTGMSessionPool(config *Config, logger *zap.Logger) (dsession.SessionPool
 		logger:                 logger,
 		remoteWorkerPoolClient: client,
 		conn:                   conn,
-		sessionClosers:         make(map[string]chan struct{}),
+		sessions:               make(map[string]*sessionInfo),
 		sessionMutex:           sync.Mutex{},
 	}
 
@@ -124,10 +132,17 @@ func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, userID str
 
 		done := make(chan struct{})
 		t.sessionMutex.Lock()
-		t.sessionClosers[key] = done
+		// Store session info for worker management
+		t.sessions[key] = &sessionInfo{
+			userID:   userID,
+			apiKeyID: apiKeyID,
+			traceID:  traceID,
+			workers:  make(map[string]struct{}),
+			closer:   done,
+		}
 		t.sessionMutex.Unlock()
 
-		startKeepAlive(ctx, t.config.RequestKeepAliveDelay, done, t.remoteWorkerPoolClient, key, apiKeyID, onError, t.logger)
+		t.startKeepAlive(ctx, done, key, onError)
 	}
 
 	t.logger.Debug("borrowed request worker", zap.String("worker_key", key))
@@ -136,23 +151,129 @@ func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, userID str
 }
 
 func (t *tgmSessionPool) Release(sessionKey string) {
+	go func() {
+		t.sessionMutex.Lock()
+		sessionInfo := t.sessions[sessionKey]
+
+		// Collect all workers to release and close the session
+		var workersToRelease []string
+		var done chan struct{}
+		if sessionInfo != nil {
+			for workerKey := range sessionInfo.workers {
+				workersToRelease = append(workersToRelease, workerKey)
+			}
+			done = sessionInfo.closer
+			delete(t.sessions, sessionKey)
+		}
+		t.sessionMutex.Unlock()
+
+		// Close the done channel after releasing the lock
+		if done != nil {
+			close(done)
+		}
+
+		// Release all workers associated with this session
+		for _, workerKey := range workersToRelease {
+			t.releaseWorkerInternal(workerKey)
+		}
+
+		resp, err := t.remoteWorkerPoolClient.ReturnWorker(context.Background(),
+			&pbworker.ReturnWorkerRequest{
+				WorkerKey:                 sessionKey,
+				MinimalWorkerLifeDuration: durationpb.New(t.config.DefaultMinimalWorkerLifeDuration),
+			},
+			grpc.WaitForReady(false),
+		)
+
+		t.logger.Debug("returned request worker", zap.String("key", sessionKey), zap.Stringer("status", resp.Status), zap.Error(err))
+	}()
+}
+
+func (t *tgmSessionPool) GetWorker(ctx context.Context, serviceName string, sessionKey string, maxWorkersPerSession int) (string, error) {
+	// Look up session info
 	t.sessionMutex.Lock()
-	done := t.sessionClosers[sessionKey]
-	if done != nil {
-		close(done)
-		delete(t.sessionClosers, sessionKey)
+	sessionInfo := t.sessions[sessionKey]
+	if sessionInfo == nil {
+		t.sessionMutex.Unlock()
+		return "", fmt.Errorf("%w: session key %s not found", dsession.ErrSessionNotFound, sessionKey)
 	}
+	// Copy the values we need while holding the lock
+	userID := sessionInfo.userID
+	apiKeyID := sessionInfo.apiKeyID
+	traceID := sessionInfo.traceID
 	t.sessionMutex.Unlock()
 
-	resp, err := t.remoteWorkerPoolClient.ReturnWorker(context.Background(),
-		&pbworker.ReturnWorkerRequest{
-			WorkerKey:                 sessionKey,
-			MinimalWorkerLifeDuration: durationpb.New(t.config.DefaultMinimalWorkerLifeDuration),
+	resp, err := t.remoteWorkerPoolClient.BorrowWorker(ctx,
+		&pbworker.BorrowWorkerRequest{
+			Service:             serviceName,
+			UserId:              userID,
+			ApiKeyId:            apiKeyID,
+			TraceId:             traceID,
+			MaxWorkerForTraceId: int64(maxWorkersPerSession),
 		},
 		grpc.WaitForReady(false),
 	)
 
-	t.logger.Debug("returned request worker", zap.String("key", sessionKey), zap.Stringer("status", resp.Status), zap.Error(err))
+	if err != nil {
+		// Map gRPC errors to dsession errors
+		if grpcErr, ok := status.FromError(err); ok {
+			switch grpcErr.Code() {
+			case codes.NotFound:
+				return "", fmt.Errorf("%w: session not found", dsession.ErrSessionNotFound)
+			case codes.ResourceExhausted:
+				return "", fmt.Errorf("%w: maximum workers per session exceeded", dsession.ErrWorkersLimitExceeded)
+			}
+		}
+		return "", fmt.Errorf("failed to borrow worker: %w", err)
+	}
+
+	workerKey := resp.WorkerKey
+	workerStatus := resp.Status
+
+	if workerStatus == pbworker.BorrowWorkerResponse_resource_exhausted {
+		t.logger.Info("worker limit exceeded", zap.String("worker_key", workerKey), zap.String("status", workerStatus.String()))
+		return "", fmt.Errorf("worker limit exceeded: %w", dsession.ErrWorkersLimitExceeded)
+	}
+
+	// Track this worker under the session
+	t.sessionMutex.Lock()
+	sessionInfo = t.sessions[sessionKey]
+	if sessionInfo == nil {
+		t.sessionMutex.Unlock()
+		// Session was released, immediately release the newly acquired worker
+		go t.releaseWorkerInternal(workerKey)
+		return "", fmt.Errorf("%w: session key %s was released", dsession.ErrSessionNotFound, sessionKey)
+	}
+	sessionInfo.workers[workerKey] = struct{}{}
+	t.sessionMutex.Unlock()
+
+	t.logger.Debug("borrowed worker", zap.String("worker_key", workerKey), zap.String("session_key", sessionKey), zap.Int("max_workers", maxWorkersPerSession))
+
+	return workerKey, nil
+}
+
+func (t *tgmSessionPool) ReleaseWorker(workerKey string) {
+	// Remove worker from session tracking
+	t.sessionMutex.Lock()
+	for _, sessionInfo := range t.sessions {
+		delete(sessionInfo.workers, workerKey)
+	}
+	t.sessionMutex.Unlock()
+
+	// Release worker in a goroutine (fire-and-forget)
+	go t.releaseWorkerInternal(workerKey)
+}
+
+func (t *tgmSessionPool) releaseWorkerInternal(workerKey string) {
+	resp, err := t.remoteWorkerPoolClient.ReturnWorker(context.Background(),
+		&pbworker.ReturnWorkerRequest{
+			WorkerKey: workerKey,
+			// No MinimalWorkerLifeDuration must be set on the workers, it's only for the Session
+		},
+		grpc.WaitForReady(false),
+	)
+
+	t.logger.Debug("returned worker", zap.String("key", workerKey), zap.Stringer("status", resp.Status), zap.Error(err))
 }
 
 // createApiKeyInterceptor creates a gRPC unary interceptor that adds the X-Api-Key header
@@ -164,29 +285,55 @@ func createApiKeyInterceptor(apiKey string) grpc.UnaryClientInterceptor {
 	}
 }
 
-// startKeepAlive starts the keep-alive goroutine for a borrowed session
-func startKeepAlive(ctx context.Context, delay time.Duration, done <-chan struct{}, client pbworker.WorkerPoolClient, workerKey, apiKeyID string, onError func(error), logger *zap.Logger) {
-	originalDelay := delay
-
+// startKeepAlive starts the keep-alive goroutine for a borrowed session and its workers
+func (t *tgmSessionPool) startKeepAlive(ctx context.Context, done <-chan struct{}, sessionKey string, onError func(error)) {
 	go func() {
+		// Use a ticker for consistent intervals regardless of operation duration
+		// The ticker will fire at regular intervals from when it starts, not from when each tick is consumed
+		ticker := time.NewTicker(t.config.RequestKeepAliveDelay)
+		defer ticker.Stop()
+
+		// Track if we're in error recovery mode with 1-second intervals
+		errorMode := false
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-done:
 				return
-			case <-time.After(delay):
-				delay = originalDelay
-				_, err := client.KeepAlive(
+			case <-ticker.C:
+				// The ticker ensures consistent intervals - it ticks at regular intervals
+				// regardless of how long the keep-alive operations take
+
+				// Get session info and workers to keep alive
+				t.sessionMutex.Lock()
+				sessionInfo := t.sessions[sessionKey]
+				if sessionInfo == nil {
+					t.sessionMutex.Unlock()
+					return // Session was released
+				}
+				apiKeyID := sessionInfo.apiKeyID
+				workerKeys := make([]string, 0, len(sessionInfo.workers))
+				for workerKey := range sessionInfo.workers {
+					workerKeys = append(workerKeys, workerKey)
+				}
+				t.sessionMutex.Unlock()
+
+				hadError := false
+
+				// Keep session alive
+				_, err := t.remoteWorkerPoolClient.KeepAlive(
 					ctx,
 					&pbworker.KeepAliveRequest{
-						WorkerKey: workerKey,
+						WorkerKey: sessionKey,
 						ApiKeyId:  apiKeyID,
 					},
 					grpc.WaitForReady(false),
 				)
 				if err != nil {
-					logger.Error("failed to call keep request worker alive", zap.String("worker_id", workerKey), zap.Error(err))
+					hadError = true
+					t.logger.Error("failed to call keep session alive", zap.String("session_key", sessionKey), zap.Error(err))
 					if onError != nil {
 						// Map gRPC errors to dsession errors
 						if grpcErr, ok := status.FromError(err); ok {
@@ -199,10 +346,35 @@ func startKeepAlive(ctx context.Context, delay time.Duration, done <-chan struct
 								return
 							}
 						}
-						delay = time.Second
-						logger.Info("keep-alive failed, retrying", zap.String("worker_id", workerKey), zap.Error(err), zap.Duration("delay", delay))
-						continue
 					}
+				}
+
+				// Keep workers alive
+				for _, workerKey := range workerKeys {
+					_, err := t.remoteWorkerPoolClient.KeepAlive(
+						ctx,
+						&pbworker.KeepAliveRequest{
+							WorkerKey: workerKey,
+							ApiKeyId:  apiKeyID,
+						},
+						grpc.WaitForReady(false),
+					)
+					if err != nil {
+						hadError = true
+						t.logger.Error("failed to call keep worker alive", zap.String("worker_key", workerKey), zap.Error(err))
+					}
+				}
+
+				// On error, switch to 1-second retry interval
+				// On success after error, switch back to normal interval
+				if hadError && !errorMode {
+					ticker.Reset(time.Second)
+					errorMode = true
+					t.logger.Info("switched to error recovery mode with 1 second interval", zap.String("session_key", sessionKey))
+				} else if !hadError && errorMode {
+					ticker.Reset(t.config.RequestKeepAliveDelay)
+					errorMode = false
+					t.logger.Info("recovered from error, switched back to normal interval", zap.String("session_key", sessionKey))
 				}
 			}
 		}
