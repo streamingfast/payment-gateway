@@ -43,12 +43,7 @@ func newConfig(configURL string) (*Config, error) {
 	port := u.Port()
 
 	if hostname != "" {
-		// Only include port if it's non-standard
-		if port != "" && port != "443" && port != "80" {
-			c.Endpoint = fmt.Sprintf("%s:%s", hostname, port)
-		} else {
-			c.Endpoint = hostname
-		}
+		c.Endpoint = fmt.Sprintf("%s:%s", hostname, port)
 	}
 
 	vals := u.Query()
