@@ -9,6 +9,11 @@ It is intended for developers that would like to offer their services on this pl
 * Doc: [./auth/README.md](./auth/README.md)
 * Example: [./examples/payment-gateway-authentication](./examples/payment-gateway-authentication/main.go)
 
+### Session plugin
+
+* Doc: [./session/README.md](./session/README.md)
+* Example: [./examples/payment-gateway-session](./examples/payment-gateway-session/main.go)
+
 ### Metering plugin
 
 This library enables the `tgm://...` (formerly `paymentGateway://...`) metering plugin that can be hooked into your application for reporting usages.
@@ -25,7 +30,7 @@ func init() {
 }
 
 func main() {
-	pluginDSN := "tgm://abp.thegraph.market?network=eth-mainnet&token=${API_TOKEN}"
+	pluginDSN := "tgm://metering.thegraph.market?network=eth-mainnet&indexer-api-key=${API_KEY}"
 
 	eventEmitter, err := dmetering.New(pluginDSN, zap.NewNop())
 	if err != nil {

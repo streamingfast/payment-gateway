@@ -46,6 +46,13 @@ func newConfig(configURL string) (*Config, error) {
 	c.Endpoint = fmt.Sprintf("%s:%s", hostname, port)
 
 	vals := u.Query()
+	for k := range vals {
+		if k == "insecure" || k == "plaintext" || k == "api_key" || k == "indexer-api-key" || k == "token" || k == "network" || k == "buffer" || k == "delay" || k == "panicOnDrop" || k == "panic-on-drop" {
+			continue
+		}
+		return nil, fmt.Errorf("unknown query parameter: %s", k)
+	}
+
 	if vals.Get("insecure") == "true" {
 		c.Insecure = true
 	}
@@ -56,6 +63,9 @@ func newConfig(configURL string) (*Config, error) {
 
 	c.Token = vals.Get("token")
 	c.ApiKey = vals.Get("api_key")
+	if indexerApiKey := vals.Get("indexer-api-key"); indexerApiKey != "" {
+		c.ApiKey = indexerApiKey // new name
+	}
 
 	c.Network = vals.Get("network")
 	if c.Network == "" {
@@ -81,6 +91,9 @@ func newConfig(configURL string) (*Config, error) {
 	}
 
 	c.PanicOnDrop = vals.Get("panicOnDrop") == "true"
+	if panicOnDrop := vals.Get("panic-on-drop"); panicOnDrop == "true" {
+		c.PanicOnDrop = true // new name
+	}
 
 	return c, nil
 }

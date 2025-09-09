@@ -39,13 +39,6 @@ func newConfig(configURL string) (*Config, error) {
 		return nil, fmt.Errorf("invalid protocol: %s, expected 'tgm'", protocol)
 	}
 
-	hostname := u.Hostname()
-	port := u.Port()
-
-	if hostname != "" {
-		c.Endpoint = fmt.Sprintf("%s:%s", hostname, port)
-	}
-
 	vals := u.Query()
 	for k := range vals {
 		if k == "insecure" || k == "plaintext" || k == "request-keep-alive-delay" ||
@@ -61,6 +54,19 @@ func newConfig(configURL string) (*Config, error) {
 
 	if vals.Get("plaintext") == "true" {
 		c.Plaintext = true
+	}
+
+	hostname := u.Hostname()
+	port := u.Port()
+	if port == "" {
+		port = "443"
+		if c.Plaintext {
+			port = "80"
+		}
+	}
+
+	if hostname != "" {
+		c.Endpoint = fmt.Sprintf("%s:%s", hostname, port)
 	}
 
 	// Parse request-keep-alive-delay if provided

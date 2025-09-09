@@ -85,7 +85,17 @@ func TestConfig_new(t *testing.T) {
 			expectError: true,
 		},
 		{
-			dsn: "tgm://metering.thegraph.market?network=eth-mainnet&api_key=server_12345",
+			dsn: "tgm://metering.thegraph.market?network=eth-mainnet&api_key=server_12345", // previous api key param name
+			expect: &Config{
+				Endpoint:   "metering.thegraph.market:443",
+				Network:    "eth-mainnet",
+				Delay:      100 * time.Millisecond,
+				BufferSize: 10000,
+				ApiKey:     "server_12345",
+			},
+		},
+		{
+			dsn: "tgm://metering.thegraph.market?network=eth-mainnet&indexer-api-key=server_12345", // new api key param name
 			expect: &Config{
 				Endpoint:   "metering.thegraph.market:443",
 				Network:    "eth-mainnet",

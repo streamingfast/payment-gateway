@@ -41,12 +41,12 @@ func TestConfig_new(t *testing.T) {
 			},
 		},
 		{
-			name: "custom endpoint",
-			dsn:  "tgm://custom.thegraph.market",
+			name: "custom endpoint default port for plaintext",
+			dsn:  "tgm://custom.thegraph.market?plaintext=true",
 			expect: &Config{
-				Endpoint:                 "custom.thegraph.market",
+				Endpoint:                 "custom.thegraph.market:80",
 				Insecure:                 false,
-				Plaintext:                false,
+				Plaintext:                true,
 				RequestKeepAliveDelay:    20 * time.Second,
 				DefaultMaxRequestPerUser: 10,
 				IndexerApiKey:            "",
@@ -80,7 +80,7 @@ func TestConfig_new(t *testing.T) {
 			name: "custom request keep alive delay",
 			dsn:  "tgm://session.thegraph.market?request-keep-alive-delay=45s",
 			expect: &Config{
-				Endpoint:                 "session.thegraph.market",
+				Endpoint:                 "session.thegraph.market:443",
 				Insecure:                 false,
 				Plaintext:                false,
 				RequestKeepAliveDelay:    45 * time.Second,
@@ -92,7 +92,7 @@ func TestConfig_new(t *testing.T) {
 			name: "custom max requests per user",
 			dsn:  "tgm://session.thegraph.market?default-max-request-per-user=20",
 			expect: &Config{
-				Endpoint:                 "session.thegraph.market",
+				Endpoint:                 "session.thegraph.market:443",
 				Insecure:                 false,
 				Plaintext:                false,
 				RequestKeepAliveDelay:    20 * time.Second,
@@ -122,7 +122,7 @@ func TestConfig_new(t *testing.T) {
 			name: "zero max requests per user",
 			dsn:  "tgm://session.thegraph.market?default-max-request-per-user=0",
 			expect: &Config{
-				Endpoint:                 "session.thegraph.market",
+				Endpoint:                 "session.thegraph.market:443",
 				Insecure:                 false,
 				Plaintext:                false,
 				RequestKeepAliveDelay:    20 * time.Second,
