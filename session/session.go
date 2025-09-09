@@ -121,9 +121,14 @@ func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, userID str
 	key := resp.WorkerKey
 	workerStatus := resp.Status
 
+	details := ""
+	if maxWorkers := resp.WorkerState.GetMaxWorkers(); maxWorkers != 0 {
+		details = fmt.Sprintf(" (active sessions: %d/%d)", maxWorkers, maxWorkers)
+	}
+
 	if workerStatus == pbworker.BorrowWorkerResponse_resource_exhausted {
 		t.logger.Info("worker pool is exhausted", zap.String("worker_key", key), zap.String("status", workerStatus.String()))
-		return "", fmt.Errorf("worker pool exhausted: %w", dsession.ErrConcurrentStreamLimitExceeded)
+		return "", fmt.Errorf("%w%s", dsession.ErrConcurrentStreamLimitExceeded, details)
 	}
 
 	// Start keep-alive for borrowed workers
@@ -228,9 +233,14 @@ func (t *tgmSessionPool) GetWorker(ctx context.Context, serviceName string, sess
 	workerKey := resp.WorkerKey
 	workerStatus := resp.Status
 
+	details := ""
+	if maxWorkers := resp.WorkerState.GetMaxWorkers(); maxWorkers != 0 {
+		details = fmt.Sprintf(" (active workers: %d/%d)", maxWorkers, maxWorkers)
+	}
+
 	if workerStatus == pbworker.BorrowWorkerResponse_resource_exhausted {
 		t.logger.Info("worker limit exceeded", zap.String("worker_key", workerKey), zap.String("status", workerStatus.String()))
-		return "", fmt.Errorf("worker limit exceeded: %w", dsession.ErrWorkersLimitExceeded)
+		return "", fmt.Errorf("%w%s", dsession.ErrWorkersLimitExceeded, details)
 	}
 
 	// Track this worker under the session
