@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // Register registers the TGM session pool with dauth
@@ -183,7 +184,8 @@ func (t *tgmSessionPool) Release(sessionKey string) {
 
 		resp, err := t.remoteWorkerPoolClient.ReturnWorker(context.Background(),
 			&pbworker.ReturnWorkerRequest{
-				WorkerKey: sessionKey,
+				WorkerKey:                 sessionKey,
+				MinimalWorkerLifeDuration: &durationpb.Duration{Seconds: int64(t.config.MinimalWorkerLifeDuration.Seconds())},
 			},
 			grpc.WaitForReady(false),
 		)
