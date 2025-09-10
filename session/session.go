@@ -128,7 +128,7 @@ func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, userID str
 	}
 
 	if workerStatus == pbworker.BorrowWorkerResponse_resource_exhausted {
-		t.logger.Debug("worker pool is exhausted", zap.String("status", workerStatus.String()), zap.String("details", details))
+		t.logger.Debug("session pool is exhausted", zap.String("status", workerStatus.String()), zap.String("details", details))
 		return "", fmt.Errorf("%w%s", dsession.ErrConcurrentStreamLimitExceeded, details)
 	}
 
@@ -241,7 +241,7 @@ func (t *tgmSessionPool) GetWorker(ctx context.Context, serviceName string, sess
 	}
 
 	if workerStatus == pbworker.BorrowWorkerResponse_resource_exhausted {
-		t.logger.Info("worker limit exceeded", zap.String("worker_key", workerKey), zap.String("status", workerStatus.String()))
+		t.logger.Debug("worker limit exceeded", zap.String("worker_key", workerKey), zap.String("status", workerStatus.String()))
 		return "", fmt.Errorf("%w%s", dsession.ErrWorkersLimitExceeded, details)
 	}
 
