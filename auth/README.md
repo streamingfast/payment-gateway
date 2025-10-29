@@ -94,7 +94,7 @@ The authentication plugin puts "Trusted Headers" in the context
 trustedHeaders := dauth.FromContext(ctx)
 
 // some helpers around common headers
-userID :=	trustedHeaders.UserID()
+organizationID := trustedHeaders.OrganizationID()
 apiKeyID := trustedHeaders.APIKeyID()
 
 // some application-specific headers

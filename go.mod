@@ -5,14 +5,14 @@ go 1.24.2
 require (
 	connectrpc.com/connect v1.18.1
 	github.com/lestrrat-go/jwx/v3 v3.0.10
-	github.com/streamingfast/dauth v0.0.0-20250821195214-8e2a3c300f97
+	github.com/streamingfast/dauth v0.0.0-20251029141649-15559a9f457b
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20240423143010-f36784700c9a
 	github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e
 	github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed
-	github.com/streamingfast/dsession v0.0.0-20250904235523-ffe9952a12d3
+	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
 	github.com/streamingfast/shutter v1.5.0
-	github.com/streamingfast/worker-pool-protocol v0.0.0-20250826200931-136a043ecece
+	github.com/streamingfast/worker-pool-protocol v0.0.0-20251029142144-b539534f3eb1
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/oauth2 v0.29.0
@@ -105,5 +105,3 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/streamingfast/dauth => /Users/stepd/repos/dauth

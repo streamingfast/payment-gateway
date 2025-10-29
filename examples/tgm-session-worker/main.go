@@ -18,14 +18,14 @@ func main() {
 	ctx := context.Background()
 
 	// Create session pool
-	sessionPluginDSN := "tgm://session.thegraph.market?request-keep-alive-delay=30s&default-max-request-per-user=5&indexer-api-key=server_1234567890abcdef"
+	sessionPluginDSN := "tgm://session.thegraph.market?request-keep-alive-delay=30s&default-max-request-per-organization=5&indexer-api-key=server_1234567890abcdef"
 	sessionPool, err := dsession.New(sessionPluginDSN, zap.NewNop())
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// User and service information
-	userID := "user123"
+	organizationID := "user123"
 	apiKeyID := "key456"
 	traceID := "trace789"
 	serviceName := "my-service"

@@ -47,7 +47,10 @@ message AuthenticateResponse {
   bool success = 2;
   string jwt = 1;
   uint64 expiration = 3;
-  string user_id = 4;
+  // OrganizationID was previously named user_id, it has been renamed
+  // to better reflect the underlying data model, the wire format
+  // remains the same for backward compatibility.
+  string organization_id = 4;
   string jwt_id = 5;
   //bytes key_authority = 6; // Who signed this? What's the public key? For us to validate whether we will honor this partner. Say this is E&N's, are we configured to honor those keys?
 }

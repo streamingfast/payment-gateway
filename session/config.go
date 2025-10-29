@@ -8,23 +8,23 @@ import (
 )
 
 type Config struct {
-	Endpoint                  string        // session endpoint, ex: session.thegraph.market
-	Insecure                  bool          // skip certificate verification on endpoint
-	Plaintext                 bool          // skip encryption on endpoint
-	RequestKeepAliveDelay     time.Duration // delay between keep alive requests
-	DefaultMaxRequestPerUser  uint64        // default maximum requests per user
-	IndexerApiKey             string        // indexer API key for X-Api-Key header
-	MinimalWorkerLifeDuration time.Duration // minimal worker life duration
+	Endpoint                         string        // session endpoint, ex: session.thegraph.market
+	Insecure                         bool          // skip certificate verification on endpoint
+	Plaintext                        bool          // skip encryption on endpoint
+	RequestKeepAliveDelay            time.Duration // delay between keep alive requests
+	DefaultMaxRequestPerOrganization uint64        // default maximum requests per organization
+	IndexerApiKey                    string        // indexer API key for X-Api-Key header
+	MinimalWorkerLifeDuration        time.Duration // minimal worker life duration
 }
 
 func newConfig(configURL string) (*Config, error) {
 	c := &Config{
-		Endpoint:                  "session.thegraph.market",
-		Insecure:                  false,
-		Plaintext:                 false,
-		RequestKeepAliveDelay:     20 * time.Second,
-		DefaultMaxRequestPerUser:  10,
-		MinimalWorkerLifeDuration: time.Second * 5,
+		Endpoint:                         "session.thegraph.market",
+		Insecure:                         false,
+		Plaintext:                        false,
+		RequestKeepAliveDelay:            20 * time.Second,
+		DefaultMaxRequestPerOrganization: 10,
+		MinimalWorkerLifeDuration:        time.Second * 5,
 	}
 
 	if configURL == "" {
@@ -44,7 +44,8 @@ func newConfig(configURL string) (*Config, error) {
 	vals := u.Query()
 	for k := range vals {
 		if k == "insecure" || k == "plaintext" || k == "request-keep-alive-delay" ||
-			k == "default-max-request-per-user" || k == "indexer-api-key" || k == "minimal-worker-life-duration" {
+			k == "default-max-request-per-user" || k == "default-max-request-per-organization" ||
+			k == "indexer-api-key" || k == "minimal-worker-life-duration" {
 			continue
 		}
 		return nil, fmt.Errorf("unknown query parameter: %s", k)
@@ -88,13 +89,19 @@ func newConfig(configURL string) (*Config, error) {
 		c.MinimalWorkerLifeDuration = duration
 	}
 
-	// Parse default-max-request-per-user if provided
-	if maxRequests := vals.Get("default-max-request-per-user"); maxRequests != "" {
+	// Parse default-max-request-per-organization if provided
+	maxRequests := vals.Get("default-max-request-per-organization")
+	if maxRequests == "" {
+		// Check for legacy parameter name
+		maxRequests = vals.Get("default-max-request-per-user")
+	}
+
+	if maxRequests != "" {
 		maxReq, err := strconv.ParseUint(maxRequests, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("invalid default-max-request-per-user: %w", err)
+			return nil, fmt.Errorf("invalid default-max-request-per-organization: %w", err)
 		}
-		c.DefaultMaxRequestPerUser = maxReq
+		c.DefaultMaxRequestPerOrganization = maxReq
 	}
 
 	// Parse indexer-api-key if provided

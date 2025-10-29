@@ -5,3 +5,5 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). S
 for instructions to keep up to date.
 
 ## v0.0.1
+
+* Multiple rename of `User` to `Organization`, simple rename, should be easy to spot them on upgrade and simply change the name, all behavior remain the same.

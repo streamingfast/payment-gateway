@@ -34,11 +34,11 @@ func Register() {
 }
 
 type sessionInfo struct {
-	userID   string
-	apiKeyID string
-	traceID  string
-	workers  map[string]struct{} // Track worker keys for this session
-	closer   chan struct{}       // Channel to signal session closure
+	organizationID string
+	apiKeyID       string
+	traceID        string
+	workers        map[string]struct{} // Track worker keys for this session
+	closer         chan struct{}       // Channel to signal session closure
 }
 
 type tgmSessionPool struct {
@@ -93,13 +93,13 @@ func newTGMSessionPool(config *Config, logger *zap.Logger) (dsession.SessionPool
 	return pool, nil
 }
 
-func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, userID string, apiKeyID string, traceID string, onError func(error)) (string, error) {
+func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, organizationID string, apiKeyID string, traceID string, onError func(error)) (string, error) {
 	resp, err := t.remoteWorkerPoolClient.BorrowWorker(ctx,
 		&pbworker.BorrowWorkerRequest{
-			Service:  serviceName,
-			UserId:   userID,
-			ApiKeyId: apiKeyID,
-			TraceId:  traceID,
+			Service:        serviceName,
+			OrganizationId: organizationID,
+			ApiKeyId:       apiKeyID,
+			TraceId:        traceID,
 		},
 		grpc.WaitForReady(false),
 	)
@@ -139,11 +139,11 @@ func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, userID str
 		t.sessionMutex.Lock()
 		// Store session info for worker management
 		t.sessions[key] = &sessionInfo{
-			userID:   userID,
-			apiKeyID: apiKeyID,
-			traceID:  traceID,
-			workers:  make(map[string]struct{}),
-			closer:   done,
+			organizationID: organizationID,
+			apiKeyID:       apiKeyID,
+			traceID:        traceID,
+			workers:        make(map[string]struct{}),
+			closer:         done,
 		}
 		t.sessionMutex.Unlock()
 
@@ -203,7 +203,7 @@ func (t *tgmSessionPool) GetWorker(ctx context.Context, serviceName string, sess
 		return "", fmt.Errorf("%w: session key %s not found", dsession.ErrSessionNotFound, sessionKey)
 	}
 	// Copy the values we need while holding the lock
-	userID := sessionInfo.userID
+	organizationID := sessionInfo.organizationID
 	apiKeyID := sessionInfo.apiKeyID
 	traceID := sessionInfo.traceID
 	t.sessionMutex.Unlock()
@@ -211,7 +211,7 @@ func (t *tgmSessionPool) GetWorker(ctx context.Context, serviceName string, sess
 	resp, err := t.remoteWorkerPoolClient.BorrowWorker(ctx,
 		&pbworker.BorrowWorkerRequest{
 			Service:             serviceName,
-			UserId:              userID,
+			OrganizationId:      organizationID,
 			ApiKeyId:            apiKeyID,
 			TraceId:             traceID,
 			MaxWorkerForTraceId: int64(maxWorkersPerSession),

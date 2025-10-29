@@ -44,7 +44,7 @@ func createTestJWKSet(publicKey *ecdsa.PublicKey) (jwk.Set, error) {
 	return set, nil
 }
 
-func createTestJWT(privateKey *ecdsa.PrivateKey, claims map[string]interface{}) (string, error) {
+func createTestJWT(privateKey *ecdsa.PrivateKey, claims map[string]any) (string, error) {
 	token := jwt.New()
 
 	// Set standard claims
@@ -166,11 +166,11 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create test JWT with various claims
-	validJWT, err := createTestJWT(privateKey, map[string]interface{}{
+	validJWT, err := createTestJWT(privateKey, map[string]any{
 		"uid":                  "test-user-123",
 		"aki":                  "api-key-456",
 		"substreams_plan_tier": "pro",
-		"cfg": map[string]interface{}{
+		"cfg": map[string]any{
 			"max_requests": "1000",
 			"enable_beta":  "true",
 		},
@@ -203,7 +203,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 			wantError: false,
 			checkContext: func(t *testing.T, ctx context.Context) {
 				headers := dauth.FromContext(ctx)
-				assert.Equal(t, "test-user-123", headers[dauth.HeaderUserID])
+				assert.Equal(t, "test-user-123", headers[dauth.HeaderOrganizationID])
 				assert.Equal(t, "api-key-456", headers[dauth.HeaderApiKeyID])
 				assert.Equal(t, "pro", headers[dauth.HeaderSubstreamsPlanTier])
 				assert.Equal(t, "1000", headers["x-max-requests"])
@@ -218,7 +218,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 			wantError: false,
 			checkContext: func(t *testing.T, ctx context.Context) {
 				headers := dauth.FromContext(ctx)
-				assert.Equal(t, "test-user-123", headers[dauth.HeaderUserID])
+				assert.Equal(t, "test-user-123", headers[dauth.HeaderOrganizationID])
 			},
 		},
 		{
@@ -254,7 +254,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 			wantError: false,
 			checkContext: func(t *testing.T, ctx context.Context) {
 				headers := dauth.FromContext(ctx)
-				assert.Equal(t, "test-user-123", headers[dauth.HeaderUserID])
+				assert.Equal(t, "test-user-123", headers[dauth.HeaderOrganizationID])
 			},
 		},
 		{
@@ -297,7 +297,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 			checkContext: func(t *testing.T, ctx context.Context) {
 				headers := dauth.FromContext(ctx)
 				// Should have claims from the new reissued token
-				assert.Equal(t, "test-user-123", headers[dauth.HeaderUserID])
+				assert.Equal(t, "test-user-123", headers[dauth.HeaderOrganizationID])
 			},
 		},
 		{
@@ -308,7 +308,7 @@ func TestAuthenticator_Authenticate(t *testing.T) {
 			wantError: false,
 			checkContext: func(t *testing.T, ctx context.Context) {
 				headers := dauth.FromContext(ctx)
-				assert.Equal(t, "test-user-123", headers[dauth.HeaderUserID])
+				assert.Equal(t, "test-user-123", headers[dauth.HeaderOrganizationID])
 			},
 		},
 		{
@@ -384,14 +384,14 @@ func TestAuthenticator_ParseJWT(t *testing.T) {
 	jwkSet, err := createTestJWKSet(publicKey)
 	require.NoError(t, err)
 
-	validJWT, err := createTestJWT(privateKey, map[string]interface{}{
+	validJWT, err := createTestJWT(privateKey, map[string]any{
 		"uid": "test-user",
 	})
 	require.NoError(t, err)
 
 	// Create JWT with different key
 	differentKey, _, _ := generateTestKeyPair()
-	invalidJWT, _ := createTestJWT(differentKey, map[string]interface{}{
+	invalidJWT, _ := createTestJWT(differentKey, map[string]any{
 		"uid": "test-user",
 	})
 
@@ -486,20 +486,20 @@ func TestAuthenticator_addClaimsToContext(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		claims    map[string]interface{}
+		claims    map[string]any
 		ipAddress string
 		expected  map[string]string
 	}{
 		{
 			name: "standard claims",
-			claims: map[string]interface{}{
+			claims: map[string]any{
 				"uid":                  "user123",
 				"aki":                  "key456",
 				"substreams_plan_tier": "pro",
 			},
 			ipAddress: "10.0.0.1",
 			expected: map[string]string{
-				dauth.HeaderUserID:             "user123",
+				dauth.HeaderOrganizationID:     "user123",
 				dauth.HeaderApiKeyID:           "key456",
 				dauth.HeaderSubstreamsPlanTier: "pro",
 				dauth.HeaderIP:                 "10.0.0.1",
@@ -507,19 +507,19 @@ func TestAuthenticator_addClaimsToContext(t *testing.T) {
 		},
 		{
 			name: "legacy subject with uid prefix",
-			claims: map[string]interface{}{
+			claims: map[string]any{
 				jwt.SubjectKey: "uid:legacy-user",
 			},
 			ipAddress: "10.0.0.2",
 			expected: map[string]string{
-				dauth.HeaderUserID: "legacy-user",
-				dauth.HeaderIP:     "10.0.0.2",
+				dauth.HeaderOrganizationID: "legacy-user",
+				dauth.HeaderIP:             "10.0.0.2",
 			},
 		},
 		{
 			name: "feature configs",
-			claims: map[string]interface{}{
-				"cfg": map[string]interface{}{
+			claims: map[string]any{
+				"cfg": map[string]any{
 					"max_requests":     "1000",
 					"enable_feature_x": "true",
 					"rate_limit":       "500",
@@ -603,7 +603,7 @@ func TestAuthenticator_issueJWTFromAPIKey(t *testing.T) {
 	jwkSet, err := createTestJWKSet(publicKey)
 	require.NoError(t, err)
 
-	validJWT, err := createTestJWT(privateKey, map[string]interface{}{
+	validJWT, err := createTestJWT(privateKey, map[string]any{
 		"uid": "api-user",
 	})
 	require.NoError(t, err)
@@ -700,12 +700,12 @@ func TestAuthenticator_reissueJWT(t *testing.T) {
 	jwkSet, err := createTestJWKSet(publicKey)
 	require.NoError(t, err)
 
-	oldJWT, err := createTestJWT(privateKey, map[string]interface{}{
+	oldJWT, err := createTestJWT(privateKey, map[string]any{
 		"uid": "old-user",
 	})
 	require.NoError(t, err)
 
-	newJWT, err := createTestJWT(privateKey, map[string]interface{}{
+	newJWT, err := createTestJWT(privateKey, map[string]any{
 		"uid": "refreshed-user",
 	})
 	require.NoError(t, err)
@@ -823,7 +823,7 @@ func TestAuthenticator_extractAndParseJWT(t *testing.T) {
 	jwkSet, err := createTestJWKSet(publicKey)
 	require.NoError(t, err)
 
-	validJWT, err := createTestJWT(privateKey, map[string]interface{}{
+	validJWT, err := createTestJWT(privateKey, map[string]any{
 		"uid": "test-user",
 	})
 	require.NoError(t, err)

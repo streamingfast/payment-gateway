@@ -124,7 +124,7 @@ func TestEndToEndAuthentication(t *testing.T) {
 		assert.NoError(t, err)
 
 		trustedHeaders := dauth.FromContext(newCtx)
-		assert.Equal(t, "test-user-123", trustedHeaders[dauth.HeaderUserID])
+		assert.Equal(t, "test-user-123", trustedHeaders[dauth.HeaderOrganizationID])
 		assert.Equal(t, "api-key-456", trustedHeaders[dauth.HeaderApiKeyID])
 		assert.Equal(t, "pro", trustedHeaders[dauth.HeaderSubstreamsPlanTier])
 		assert.Equal(t, "192.168.1.1", trustedHeaders[dauth.HeaderIP])
@@ -142,7 +142,7 @@ func TestEndToEndAuthentication(t *testing.T) {
 		assert.NoError(t, err)
 
 		trustedHeaders := dauth.FromContext(newCtx)
-		assert.Equal(t, "test-user-123", trustedHeaders[dauth.HeaderUserID])
+		assert.Equal(t, "test-user-123", trustedHeaders[dauth.HeaderOrganizationID])
 		assert.Equal(t, "10.0.0.1", trustedHeaders[dauth.HeaderIP])
 	})
 
@@ -177,7 +177,7 @@ func TestEndToEndAuthentication(t *testing.T) {
 
 		trustedHeaders := dauth.FromContext(newCtx)
 		// Should have the reissued user ID
-		assert.Equal(t, "reissued-user", trustedHeaders[dauth.HeaderUserID])
+		assert.Equal(t, "reissued-user", trustedHeaders[dauth.HeaderOrganizationID])
 	})
 
 	// Test 5: Missing authentication
@@ -210,7 +210,7 @@ func TestEndToEndAuthentication(t *testing.T) {
 		assert.NoError(t, err)
 
 		trustedHeaders := dauth.FromContext(newCtx)
-		assert.Equal(t, "test-user-123", trustedHeaders[dauth.HeaderUserID])
+		assert.Equal(t, "test-user-123", trustedHeaders[dauth.HeaderOrganizationID])
 	})
 
 	// Test 8: Expired JWT

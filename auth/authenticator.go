@@ -319,13 +319,13 @@ func (a *authenticator) addClaimsToContext(ctx context.Context, token jwt.Token,
 	trustedHeaders := make(dauth.TrustedHeaders)
 
 	// Add standard headers
-	var userID string
-	if err := token.Get("uid", &userID); err == nil {
-		trustedHeaders[dauth.HeaderUserID] = userID
+	var organizationID string
+	if err := token.Get("uid", &organizationID); err == nil {
+		trustedHeaders[dauth.HeaderOrganizationID] = organizationID
 	} else if subject, ok := token.Subject(); ok {
-		// Legacy support: extract user ID from subject if it starts with "uid:"
-		if strings.HasPrefix(subject, "uid:") {
-			trustedHeaders[dauth.HeaderUserID] = strings.TrimPrefix(subject, "uid:")
+		// Legacy support: extract organization ID from subject if it starts with "uid:"
+		if after, cut := strings.CutPrefix(subject, "uid:"); cut {
+			trustedHeaders[dauth.HeaderOrganizationID] = after
 		}
 	}
 
