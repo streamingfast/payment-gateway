@@ -6,10 +6,10 @@ require (
 	connectrpc.com/connect v1.18.1
 	github.com/lestrrat-go/jwx/v3 v3.0.10
 	github.com/streamingfast/dauth v0.0.0-20251029141649-15559a9f457b
-	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
-	github.com/streamingfast/dgrpc v0.0.0-20240423143010-f36784700c9a
-	github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e
-	github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed
+	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
+	github.com/streamingfast/dgrpc v0.0.0-20251103214659-aab4b9f09bfd
+	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
+	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175
 	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20251029142144-b539534f3eb1
@@ -24,7 +24,7 @@ require (
 	cloud.google.com/go/auth v0.16.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
-	cloud.google.com/go/trace v1.10.5 // indirect
+	cloud.google.com/go/trace v1.10.4 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.26.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.15.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.39.0 // indirect
@@ -100,8 +100,11 @@ require (
 	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/api v0.230.0 // indirect
-	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+)
+
+replace (
+	github.com/envoyproxy/go-control-plane/envoy => github.com/envoyproxy/go-control-plane/envoy v1.32.4
 )

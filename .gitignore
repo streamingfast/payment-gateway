@@ -1,3 +1,7 @@
 .envrc
 build/
 dist/
+/.idea/.gitignore
+/.idea/modules.xml
+/.idea/tgm-gateway.iml
+/.idea/vcs.xml
