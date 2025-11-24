@@ -39,6 +39,7 @@ type sessionInfo struct {
 	traceID        string
 	workers        map[string]struct{} // Track worker keys for this session
 	closer         chan struct{}       // Channel to signal session closure
+	mutex          sync.Mutex
 }
 
 type tgmSessionPool struct {
@@ -47,11 +48,7 @@ type tgmSessionPool struct {
 	remoteWorkerPoolClient pbworker.WorkerPoolClient
 	conn                   *grpc.ClientConn
 	sessions               map[string]*sessionInfo // Map sessionKey -> session info
-	sessionMutex           sync.Mutex
-}
-
-type borrowedSession struct {
-	done chan struct{}
+	sessionsMutex          sync.Mutex
 }
 
 func newTGMSessionPool(config *Config, logger *zap.Logger) (dsession.SessionPool, error) {
@@ -87,7 +84,7 @@ func newTGMSessionPool(config *Config, logger *zap.Logger) (dsession.SessionPool
 		remoteWorkerPoolClient: client,
 		conn:                   conn,
 		sessions:               make(map[string]*sessionInfo),
-		sessionMutex:           sync.Mutex{},
+		sessionsMutex:          sync.Mutex{},
 	}
 
 	return pool, nil
@@ -136,7 +133,7 @@ func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, organizati
 	if workerStatus == pbworker.BorrowWorkerResponse_borrowed {
 
 		done := make(chan struct{})
-		t.sessionMutex.Lock()
+		t.sessionsMutex.Lock()
 		// Store session info for worker management
 		t.sessions[key] = &sessionInfo{
 			organizationID: organizationID,
@@ -145,7 +142,7 @@ func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, organizati
 			workers:        make(map[string]struct{}),
 			closer:         done,
 		}
-		t.sessionMutex.Unlock()
+		t.sessionsMutex.Unlock()
 
 		t.startKeepAlive(ctx, done, key, onError)
 	}
@@ -157,8 +154,10 @@ func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, organizati
 
 func (t *tgmSessionPool) Release(sessionKey string) {
 	go func() {
-		t.sessionMutex.Lock()
+		t.sessionsMutex.Lock()
 		sessionInfo := t.sessions[sessionKey]
+		sessionInfo.mutex.Lock()
+		defer sessionInfo.mutex.Unlock()
 
 		// Collect all workers to release and close the session
 		var workersToRelease []string
@@ -170,7 +169,7 @@ func (t *tgmSessionPool) Release(sessionKey string) {
 			done = sessionInfo.closer
 			delete(t.sessions, sessionKey)
 		}
-		t.sessionMutex.Unlock()
+		t.sessionsMutex.Unlock()
 
 		// Close the done channel after releasing the lock
 		if done != nil {
@@ -196,17 +195,17 @@ func (t *tgmSessionPool) Release(sessionKey string) {
 
 func (t *tgmSessionPool) GetWorker(ctx context.Context, serviceName string, sessionKey string, maxWorkersPerSession int) (string, error) {
 	// Look up session info
-	t.sessionMutex.Lock()
+	t.sessionsMutex.Lock()
 	sessionInfo := t.sessions[sessionKey]
 	if sessionInfo == nil {
-		t.sessionMutex.Unlock()
+		t.sessionsMutex.Unlock()
 		return "", fmt.Errorf("%w: session key %s not found", dsession.ErrSessionNotFound, sessionKey)
 	}
 	// Copy the values we need while holding the lock
 	organizationID := sessionInfo.organizationID
 	apiKeyID := sessionInfo.apiKeyID
 	traceID := sessionInfo.traceID
-	t.sessionMutex.Unlock()
+	t.sessionsMutex.Unlock()
 
 	resp, err := t.remoteWorkerPoolClient.BorrowWorker(ctx,
 		&pbworker.BorrowWorkerRequest{
@@ -246,16 +245,16 @@ func (t *tgmSessionPool) GetWorker(ctx context.Context, serviceName string, sess
 	}
 
 	// Track this worker under the session
-	t.sessionMutex.Lock()
+	t.sessionsMutex.Lock()
 	sessionInfo = t.sessions[sessionKey]
 	if sessionInfo == nil {
-		t.sessionMutex.Unlock()
+		t.sessionsMutex.Unlock()
 		// Session was released, immediately release the newly acquired worker
 		go t.releaseWorkerInternal(workerKey)
 		return "", fmt.Errorf("%w: session key %s was released", dsession.ErrSessionNotFound, sessionKey)
 	}
 	sessionInfo.workers[workerKey] = struct{}{}
-	t.sessionMutex.Unlock()
+	t.sessionsMutex.Unlock()
 
 	t.logger.Debug("borrowed worker", zap.String("worker_key", workerKey), zap.String("session_key", sessionKey), zap.Int("max_workers", maxWorkersPerSession))
 
@@ -264,11 +263,11 @@ func (t *tgmSessionPool) GetWorker(ctx context.Context, serviceName string, sess
 
 func (t *tgmSessionPool) ReleaseWorker(workerKey string) {
 	// Remove worker from session tracking
-	t.sessionMutex.Lock()
+	t.sessionsMutex.Lock()
 	for _, sessionInfo := range t.sessions {
 		delete(sessionInfo.workers, workerKey)
 	}
-	t.sessionMutex.Unlock()
+	t.sessionsMutex.Unlock()
 
 	// Release worker in a goroutine (fire-and-forget)
 	go t.releaseWorkerInternal(workerKey)
@@ -316,18 +315,19 @@ func (t *tgmSessionPool) startKeepAlive(ctx context.Context, done <-chan struct{
 				// regardless of how long the keep-alive operations take
 
 				// Get session info and workers to keep alive
-				t.sessionMutex.Lock()
+				t.sessionsMutex.Lock()
 				sessionInfo := t.sessions[sessionKey]
 				if sessionInfo == nil {
-					t.sessionMutex.Unlock()
+					t.sessionsMutex.Unlock()
 					return // Session was released
 				}
+				sessionInfo.mutex.Lock()
 				apiKeyID := sessionInfo.apiKeyID
 				workerKeys := make([]string, 0, len(sessionInfo.workers))
 				for workerKey := range sessionInfo.workers {
 					workerKeys = append(workerKeys, workerKey)
 				}
-				t.sessionMutex.Unlock()
+				t.sessionsMutex.Unlock()
 
 				hadError := false
 
@@ -340,6 +340,7 @@ func (t *tgmSessionPool) startKeepAlive(ctx context.Context, done <-chan struct{
 					},
 					grpc.WaitForReady(false),
 				)
+
 				if err != nil {
 					hadError = true
 					t.logger.Error("failed to call keep session alive", zap.String("session_key", sessionKey), zap.Error(err))
@@ -349,9 +350,11 @@ func (t *tgmSessionPool) startKeepAlive(ctx context.Context, done <-chan struct{
 							switch grpcErr.Code() {
 							case codes.PermissionDenied:
 								onError(fmt.Errorf("%w: %s", dsession.ErrPermissionDenied, grpcErr.Message()))
+								sessionInfo.mutex.Unlock()
 								return
 							case codes.ResourceExhausted:
 								onError(fmt.Errorf("%w: %s", dsession.ErrQuotaExceeded, grpcErr.Message()))
+								sessionInfo.mutex.Unlock()
 								return
 							}
 						}
@@ -373,6 +376,7 @@ func (t *tgmSessionPool) startKeepAlive(ctx context.Context, done <-chan struct{
 						t.logger.Error("failed to call keep worker alive", zap.String("worker_key", workerKey), zap.Error(err))
 					}
 				}
+				sessionInfo.mutex.Unlock()
 
 				// On error, switch to 1-second retry interval
 				// On success after error, switch back to normal interval
