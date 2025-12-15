@@ -5,3 +5,4 @@ dist/
 /.idea/modules.xml
 /.idea/tgm-gateway.iml
 /.idea/vcs.xml
+/.idea/go.imports.xml

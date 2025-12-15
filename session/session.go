@@ -155,6 +155,8 @@ func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, organizati
 func (t *tgmSessionPool) Release(sessionKey string) {
 	go func() {
 		t.sessionsMutex.Lock()
+		defer t.sessionsMutex.Unlock()
+
 		sessionInfo := t.sessions[sessionKey]
 		sessionInfo.mutex.Lock()
 		defer sessionInfo.mutex.Unlock()
@@ -169,7 +171,6 @@ func (t *tgmSessionPool) Release(sessionKey string) {
 			done = sessionInfo.closer
 			delete(t.sessions, sessionKey)
 		}
-		t.sessionsMutex.Unlock()
 
 		// Close the done channel after releasing the lock
 		if done != nil {
@@ -264,10 +265,10 @@ func (t *tgmSessionPool) GetWorker(ctx context.Context, serviceName string, sess
 func (t *tgmSessionPool) ReleaseWorker(workerKey string) {
 	// Remove worker from session tracking
 	t.sessionsMutex.Lock()
+	defer t.sessionsMutex.Unlock()
 	for _, sessionInfo := range t.sessions {
 		delete(sessionInfo.workers, workerKey)
 	}
-	t.sessionsMutex.Unlock()
 
 	// Release worker in a goroutine (fire-and-forget)
 	go t.releaseWorkerInternal(workerKey)
