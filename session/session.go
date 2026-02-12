@@ -257,7 +257,7 @@ func (t *tgmSessionPool) GetWorker(ctx context.Context, serviceName string, sess
 	sessionInfo.workers[workerKey] = struct{}{}
 	t.sessionsMutex.Unlock()
 
-	t.logger.Debug("borrowed worker", zap.String("worker_key", workerKey), zap.String("session_key", sessionKey), zap.Int("max_workers", maxWorkersPerSession))
+	t.logger.Info("borrowed worker", zap.String("organization_id", organizationID), zap.String("api_key_id", apiKeyID), zap.String("service_name", serviceName), zap.String("trace_id", traceID), zap.String("worker_key", workerKey), zap.String("session_key", sessionKey), zap.Int("max_workers", maxWorkersPerSession))
 
 	return workerKey, nil
 }
