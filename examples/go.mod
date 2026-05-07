@@ -1,13 +1,13 @@
 module github.com/streamingfast/payment-gateway/examples
 
-go 1.24.2
+go 1.25.0
 
 require (
 	github.com/streamingfast/cli v0.0.4-0.20240412191021-5f81842cb71d
-	github.com/streamingfast/dauth v0.0.0-20250821195214-8e2a3c300f97
-	github.com/streamingfast/dgrpc v0.0.0-20240423143010-f36784700c9a
-	github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e
-	github.com/streamingfast/dsession v0.0.0-20250828135210-0b74c3e1ed99
+	github.com/streamingfast/dauth v0.0.0-20251029141649-15559a9f457b
+	github.com/streamingfast/dgrpc v0.0.0-20251103214659-aab4b9f09bfd
+	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
+	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
 	github.com/streamingfast/payment-gateway v0.0.0-20250828152322-a5f21c5f9f7a
 	go.uber.org/zap v1.27.0
 	golang.org/x/oauth2 v0.29.0
@@ -18,9 +18,8 @@ require (
 	cloud.google.com/go/auth v0.16.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
-	cloud.google.com/go/logging v1.9.0 // indirect
-	cloud.google.com/go/monitoring v1.18.0 // indirect
-	cloud.google.com/go/trace v1.10.5 // indirect
+	cloud.google.com/go/trace v1.10.6 // indirect
+	connectrpc.com/connect v1.19.2 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.26.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.15.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.39.0 // indirect
@@ -31,7 +30,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/cncf/xds/go v0.0.0-20250121191232-2f005788dc42 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -39,7 +38,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/goccy/go-json v0.10.3 // indirect
+	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
@@ -51,10 +50,11 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
 	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
+	github.com/lestrrat-go/dsig v1.2.1 // indirect
+	github.com/lestrrat-go/dsig-secp256k1 v1.0.0 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
-	github.com/lestrrat-go/httprc/v3 v3.0.0 // indirect
-	github.com/lestrrat-go/jwx/v3 v3.0.10 // indirect
-	github.com/lestrrat-go/option v1.0.1 // indirect
+	github.com/lestrrat-go/httprc/v3 v3.0.5 // indirect
+	github.com/lestrrat-go/jwx/v3 v3.1.1 // indirect
 	github.com/lestrrat-go/option/v2 v2.0.0 // indirect
 	github.com/lithammer/dedent v1.1.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
@@ -74,7 +74,7 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.0 // indirect
-	github.com/segmentio/asm v1.2.0 // indirect
+	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/sethvargo/go-retry v0.2.3 // indirect
 	github.com/spf13/afero v1.10.0 // indirect
@@ -84,15 +84,15 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.15.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
-	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1 // indirect
-	github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed // indirect
+	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7 // indirect
+	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175 // indirect
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091 // indirect
 	github.com/streamingfast/sf-tracing v0.0.0-20240209202324-9daa52c71a52 // indirect
 	github.com/streamingfast/shutter v1.5.0 // indirect
-	github.com/streamingfast/worker-pool-protocol v0.0.0-20250826200931-136a043ecece // indirect
+	github.com/streamingfast/worker-pool-protocol v0.0.0-20251029142144-b539534f3eb1 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
-	github.com/valyala/fastjson v1.6.4 // indirect
+	github.com/valyala/fastjson v1.6.10 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
@@ -111,17 +111,18 @@ require (
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/mock v0.5.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
-	golang.org/x/crypto v0.40.0 // indirect
-	golang.org/x/net v0.41.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/term v0.33.0 // indirect
-	golang.org/x/text v0.27.0 // indirect
+	golang.org/x/crypto v0.50.0 // indirect
+	golang.org/x/net v0.52.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/term v0.42.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/api v0.230.0 // indirect
+	google.golang.org/genproto v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
