@@ -155,22 +155,21 @@ func (t *tgmSessionPool) Get(ctx context.Context, serviceName string, organizati
 func (t *tgmSessionPool) Release(sessionKey string) {
 	go func() {
 		t.sessionsMutex.Lock()
-		defer t.sessionsMutex.Unlock()
-
 		sessionInfo := t.sessions[sessionKey]
-		sessionInfo.mutex.Lock()
-		defer sessionInfo.mutex.Unlock()
 
 		// Collect all workers to release and close the session
 		var workersToRelease []string
 		var done chan struct{}
 		if sessionInfo != nil {
+			sessionInfo.mutex.Lock()
 			for workerKey := range sessionInfo.workers {
 				workersToRelease = append(workersToRelease, workerKey)
 			}
 			done = sessionInfo.closer
 			delete(t.sessions, sessionKey)
+			sessionInfo.mutex.Unlock()
 		}
+		t.sessionsMutex.Unlock()
 
 		// Close the done channel after releasing the lock
 		if done != nil {
