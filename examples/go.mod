@@ -1,13 +1,13 @@
 module github.com/streamingfast/payment-gateway/examples
 
-go 1.24.2
+go 1.25.0
 
 require (
 	github.com/streamingfast/cli v0.0.4-0.20240412191021-5f81842cb71d
-	github.com/streamingfast/dauth v0.0.0-20250821195214-8e2a3c300f97
-	github.com/streamingfast/dgrpc v0.0.0-20240423143010-f36784700c9a
-	github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e
-	github.com/streamingfast/dsession v0.0.0-20250828135210-0b74c3e1ed99
+	github.com/streamingfast/dauth v0.0.0-20251029141649-15559a9f457b
+	github.com/streamingfast/dgrpc v0.0.0-20251103214659-aab4b9f09bfd
+	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
+	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
 	github.com/streamingfast/payment-gateway v0.0.0-20250828152322-a5f21c5f9f7a
 	go.uber.org/zap v1.27.0
 	golang.org/x/oauth2 v0.29.0
@@ -18,9 +18,8 @@ require (
 	cloud.google.com/go/auth v0.16.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
-	cloud.google.com/go/logging v1.9.0 // indirect
-	cloud.google.com/go/monitoring v1.18.0 // indirect
-	cloud.google.com/go/trace v1.10.5 // indirect
+	cloud.google.com/go/trace v1.10.6 // indirect
+	connectrpc.com/connect v1.20.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.26.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.15.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.39.0 // indirect
@@ -84,12 +83,12 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.15.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
-	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1 // indirect
-	github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed // indirect
+	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7 // indirect
+	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175 // indirect
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091 // indirect
 	github.com/streamingfast/sf-tracing v0.0.0-20240209202324-9daa52c71a52 // indirect
 	github.com/streamingfast/shutter v1.5.0 // indirect
-	github.com/streamingfast/worker-pool-protocol v0.0.0-20250826200931-136a043ecece // indirect
+	github.com/streamingfast/worker-pool-protocol v0.0.0-20251029142144-b539534f3eb1 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
@@ -119,9 +118,10 @@ require (
 	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/api v0.230.0 // indirect
+	google.golang.org/genproto v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

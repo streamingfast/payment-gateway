@@ -1,9 +1,9 @@
 module github.com/streamingfast/payment-gateway
 
-go 1.24.2
+go 1.25.0
 
 require (
-	connectrpc.com/connect v1.18.1
+	connectrpc.com/connect v1.20.0
 	github.com/lestrrat-go/jwx/v3 v3.0.10
 	github.com/streamingfast/dauth v0.0.0-20251029141649-15559a9f457b
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
@@ -17,14 +17,14 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/oauth2 v0.29.0
 	google.golang.org/grpc v1.72.0
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
 	cloud.google.com/go/auth v0.16.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
-	cloud.google.com/go/trace v1.10.4 // indirect
+	cloud.google.com/go/trace v1.10.6 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.26.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.15.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.39.0 // indirect
@@ -70,7 +70,7 @@ require (
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/sethvargo/go-retry v0.2.3 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
-	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424 // indirect
+	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091 // indirect
 	github.com/streamingfast/sf-tracing v0.0.0-20240209202324-9daa52c71a52 // indirect
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
@@ -100,11 +100,10 @@ require (
 	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/api v0.230.0 // indirect
+	google.golang.org/genproto v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace (
-	github.com/envoyproxy/go-control-plane/envoy => github.com/envoyproxy/go-control-plane/envoy v1.32.4
-)
+replace github.com/envoyproxy/go-control-plane/envoy => github.com/envoyproxy/go-control-plane/envoy v1.32.4
