@@ -95,7 +95,7 @@ func newWithClient(
 	dmetrics.Register(MetricSet)
 
 	e.OnTerminating(func(err error) {
-		e.logger.Info("received shutdown signal, waiting for launch loop to end", zap.Error(err))
+		e.logger.Debug("received shutdown signal, waiting for launch loop to end", zap.Error(err))
 		<-e.done
 		e.flushAndCloseEvent()
 		closeErr := e.clientCloseFunc()
@@ -130,9 +130,9 @@ func (e *emitter) flushAndCloseEvent() {
 	close(e.buffer)
 
 	t0 := time.Now()
-	e.logger.Info("waiting for event flush to complete", zap.Int("count", len(e.buffer)))
+	e.logger.Debug("waiting for event flush to complete", zap.Int("count", len(e.buffer)))
 	defer func() {
-		e.logger.Info("event flushed", zap.Duration("elapsed", time.Since(t0)))
+		e.logger.Debug("event flushed", zap.Duration("elapsed", time.Since(t0)))
 	}()
 
 	for {
@@ -140,7 +140,7 @@ func (e *emitter) flushAndCloseEvent() {
 		ev.Network = e.config.Network
 		protoEv := ev.ToProto()
 		if !ok {
-			e.logger.Info("sending last events", zap.Int("count", len(e.activeBatch)))
+			e.logger.Debug("sending last events", zap.Int("count", len(e.activeBatch)))
 			e.emit(e.activeBatch)
 			return
 		}
